@@ -172,6 +172,10 @@
     <ClInclude Include="Uniforms.h" />
     <ClInclude Include="VideoRecorder.h" />
   </ItemGroup>
+  <ItemGroup>
+    <None Include="template_fs.glsl" />
+    <None Include="template_vs.glsl" />
+  </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
