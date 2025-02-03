@@ -16,6 +16,9 @@
     <Filter Include="imgui">
       <UniqueIdentifier>{f274d5f3-0b83-4e5e-a46e-17edc7cdae90}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Shaders">
+      <UniqueIdentifier>{77da0832-fae9-4138-b49b-ef2fdf5a174f}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="Callbacks.cpp">
@@ -116,5 +119,13 @@
     <ClInclude Include="DebugCallback.h">
       <Filter>Source Files</Filter>
     </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="template_fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="template_vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>
