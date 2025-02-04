@@ -34,7 +34,7 @@ static const std::string vertex_shader("vbo_vs.glsl");
 static const std::string fragment_shader("vbo_fs.glsl");
 GLuint shader_program = -1;
 
-surf_vao surf[6];
+surf_vao surf[7];
 int draw_surf = 0; // Which of the previous VAOs to draw
 
 float angle = 0.0f;
@@ -162,7 +162,8 @@ void Scene::DrawGui(GLFWwindow* window)
    ImGui::RadioButton("GL_POINTS separate", &draw_surf, 2);
    ImGui::RadioButton("GL_TRIANGLES separate", &draw_surf, 3); ImGui::SameLine();
    ImGui::RadioButton("GL_TRIANGLES interleaved", &draw_surf, 4); ImGui::SameLine();
-   ImGui::RadioButton("indexed GL_TRIANGLES interleaved", &draw_surf, 5);
+   ImGui::RadioButton("indexed GL_TRIANGLES interleaved", &draw_surf, 5); ImGui::SameLine();
+   ImGui::RadioButton("indexed GL_TRIANGLE_STRIP interleaved", &draw_surf, 6);
    ImGui::Separator();
 
 
@@ -272,6 +273,8 @@ void Scene::Init()
 
    //for drawing indexed GL_TRIANGLES with positions, tex_coords and normals interleaved in the vbo
    surf[5] = create_indexed_surf_interleaved_vao(n);
+
+   surf[6] = create_indexed_strip_surf_interleaved_vao(n);
 #pragma endregion
 
    glPointSize(5.0f);

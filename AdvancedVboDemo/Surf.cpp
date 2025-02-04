@@ -638,3 +638,122 @@ surf_vao create_indexed_surf_interleaved_vao(int n)
    return surf;
 }
 #pragma endregion
+
+#pragma region Create surface: primitive = GL_TRIANGLE_STRIP, 3 INDEXED attributes interleaved in 1 VBO
+////////////////////////////////////////////////////////////////////////////////
+/// Create indexed surf interleaved
+/// Places interleaved positions, texture coordinates and normals into the VBO (only unique vertices)
+/// Creates an index buffer in GL_TRIANGLES order
+////////////////////////////////////////////////////////////////////////////////
+
+GLuint create_indexed_strip_surf_interleaved_vbo(int n_grid)
+{
+    //Declare a vector to hold GL_POINTS vertices, texture coordinates, and normals 
+    const int num_vertices = n_grid * n_grid;
+
+    //Note that we use a std::vector of floats here. This vector needs to hold vec3s and vec2s,
+    //so we push each component of the vec3s and vec2s into this container.
+    std::vector<float> surf_verts;
+    surf_verts.reserve((3 + 2 + 3) * num_vertices);
+
+    //Create matrix to transform indices to points
+    glm::mat3 T = glm::translate(glm::mat3(1.0f), glm::vec2(-float(n_grid) / 2.0, -float(n_grid) / 2.0));
+    glm::mat3 S = glm::scale(glm::mat3(1.0f), glm::vec2(20.0f / n_grid));
+    glm::mat3 M = S * T;
+
+    //Insert vertices: only unique positions, no sharing here. Only indices are repeated
+    for (int i = 0; i < n_grid; i++)
+    {
+        for (int j = 0; j < n_grid; j++)
+        {
+            glm::vec3 p = surf(M, i, j);
+            glm::vec2 t = glm::vec2(float(i), float(j)) / float(n_grid - 1);
+            glm::vec3 n = normal(M, i, j);
+
+            //Insert vertex
+            for (int k = 0; k < 3; k++) surf_verts.push_back(p[k]);
+            for (int k = 0; k < 2; k++) surf_verts.push_back(t[k]);
+            for (int k = 0; k < 3; k++) surf_verts.push_back(n[k]);
+        }
+    }
+
+    GLuint vbo;
+    glGenBuffers(1, &vbo); //Generate vbo to hold vertex attributes for triangle.
+    glBindBuffer(GL_ARRAY_BUFFER, vbo); //Specify the buffer where vertex attribute data is stored.
+
+    //Upload from main memory to gpu memory.
+    glBufferData(GL_ARRAY_BUFFER, sizeof(float) * surf_verts.size(), surf_verts.data(), GL_STATIC_DRAW);
+
+    return vbo;
+}
+
+GLuint create_triangle_strip_index_buffer(int n_grid)
+{
+    std::vector<unsigned int> surf_indices;
+    surf_indices.reserve((n_grid) * n_grid * 2); // Two indices per column and row
+
+    unsigned int idx = 0;
+    for (int i = 0; i < n_grid; i++) // Iterate rows
+    {
+        if (i > 0)
+        {
+            // Insert a degenerate triangle to connect strips
+            surf_indices.push_back(idx - n_grid);
+            surf_indices.push_back(idx);
+        }
+
+        for (int j = 0; j < n_grid; j++) // Iterate columns
+        {
+            // Follow your specified order: bottom vertex first, then top vertex
+            surf_indices.push_back(idx + n_grid); // Bottom row
+            surf_indices.push_back(idx);          // Top row
+
+            idx++; // Move to next column
+        }
+    }
+
+    // Upload to EBO
+    GLuint index_buffer;
+    glGenBuffers(1, &index_buffer);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * surf_indices.size(), surf_indices.data(), GL_STATIC_DRAW);
+
+    return index_buffer;
+}
+
+surf_vao create_indexed_strip_surf_interleaved_vao(int n)
+{
+    surf_vao surf;
+
+    //Generate vao id to hold the mapping from attrib variables in shader to memory locations in vbo
+    glGenVertexArrays(1, &surf.vao);
+
+    //Binding vao means that bindbuffer, enablevertexattribarray and vertexattribpointer state will be remembered by vao
+    glBindVertexArray(surf.vao);
+
+    GLuint vbo = create_indexed_strip_surf_interleaved_vbo(n);
+    surf.mode = GL_TRIANGLE_STRIP;
+    const int num_triangles = (n) * n  * 2;
+    surf.num_indices = num_triangles;
+    surf.type = GL_UNSIGNED_INT;
+
+    GLuint index_buffer = create_triangle_strip_index_buffer(n);
+
+    //Separate pos, tex_coord and normal in vbo
+    glEnableVertexAttribArray(AttribLocs::pos);
+    glEnableVertexAttribArray(AttribLocs::tex_coord);
+    glEnableVertexAttribArray(AttribLocs::normal);
+
+    //Tell opengl how to get the attribute values out of the vbo (stride and offset).
+    const int stride = (3 + 2 + 3) * sizeof(float);
+    glVertexAttribPointer(AttribLocs::pos, 3, GL_FLOAT, false, stride, BUFFER_OFFSET(0));
+    glVertexAttribPointer(AttribLocs::tex_coord, 2, GL_FLOAT, false, stride, BUFFER_OFFSET(3 * sizeof(float)));
+    glVertexAttribPointer(AttribLocs::normal, 3, GL_FLOAT, false, stride, BUFFER_OFFSET((3 + 2) * sizeof(float)));
+
+    glBindVertexArray(0); //unbind the vao
+
+    return surf;
+}
+#pragma endregion
+
+

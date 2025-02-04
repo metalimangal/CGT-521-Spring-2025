@@ -46,4 +46,6 @@ surf_vao create_surf_interleaved_vao(int n_grid);
 
 surf_vao create_indexed_surf_interleaved_vao(int n_grid);
 
+surf_vao create_indexed_strip_surf_interleaved_vao(int n_grid);
+
 #endif
