@@ -896,18 +896,15 @@ GLuint create_triangle_strip_index_buffer(int n_grid)
     std::vector<unsigned int> surf_indices;
     surf_indices.reserve((n_grid - 1) * n_grid * 2 + (n_grid - 2)); // Primitive restart rows
 
-
-    unsigned int idx = 0;
     for (int i = 0; i < n_grid - 1; i++)
     {
-        for (int j = 0; j < n_grid -1; j++)
+        for (int j = 0; j < n_grid; j++)
         {
-            surf_indices.push_back(idx + n_grid); 
-            surf_indices.push_back(idx);          
-            idx++;
+            surf_indices.push_back((i + 1) * n_grid + j);
+            surf_indices.push_back(i*n_grid + j); 
         }
         surf_indices.push_back(PRIMITIVE_RESTART_INDEX);
-        idx++;
+
 
     }
 
