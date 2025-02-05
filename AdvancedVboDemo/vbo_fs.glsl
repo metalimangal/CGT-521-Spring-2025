@@ -29,6 +29,7 @@ in VertexData
    vec2 tex_coord;
    vec3 pw;       //world-space vertex position
    vec3 nw;   //world-space normal vector
+   vec4 color;
 } inData;   //block is named 'inData'
 
 out vec4 fragcolor; //the output color for this fragment    
@@ -46,9 +47,10 @@ void main(void)
    //fragcolor = vec4(grid); return;
    vec4 color1 = vec4(0.18, 0.56, 0.82, 1.0);
    vec4 color2 = vec4(0.82, 0.40, 0.18, 1.0);
-   vec4 ktex = mix(color2, color1, grid);
+   //vec4 ktex = mix(color2, color1, grid);
+   vec4 ktex = inData.color;
    //Compute per-fragment Phong lighting
-   vec4 ambient_term = ka*ktex*La;
+   vec4 ambient_term = ka*La*ktex;
 
    const float eps = 1e-8; //small value to avoid division by 0
    float d = distance(light_w.xyz, inData.pw.xyz);

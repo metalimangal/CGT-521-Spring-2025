@@ -10,9 +10,18 @@ struct surf_vao
    GLenum mode = GL_NONE;     //Primitive mode, e.g. GL_POINTS, GL_TRIANGLES, etc...
    GLuint num_vertices = 0;   //Number of vertices to draw with glDrawArrays
 
+   GLuint instance_count = 1; //Adding instance count
+
    void DrawArrays() 
    {
-      glDrawArrays(mode, 0, num_vertices);
+       if (instance_count > 1)
+       {
+           glDrawArraysInstanced(mode, 0, num_vertices, instance_count);
+       }
+       else
+       {
+           glDrawArrays(mode, 0, num_vertices);
+       }
    }
 
    GLuint num_indices = 0; //Number of indices to draw with glDrawElements
@@ -21,7 +30,14 @@ struct surf_vao
 
    void DrawElements()
    {
-      glDrawElements(mode, num_indices, type, indices);
+       if (instance_count > 1)
+       {
+           glDrawElementsInstanced(mode, num_indices, type, indices, instance_count);
+       }
+       else
+       {
+           glDrawElements(mode, num_indices, type, indices);
+       }
    }
 
    void Draw()

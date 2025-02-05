@@ -2,6 +2,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp> //for pi
 #include <glm/gtx/matrix_transform_2d.hpp>
+#include <glm/gtc/matrix_transform.hpp>
 #include "Surf.h"
 
 //Buffer offset casts an integer to a pointer so that it can be passed as 
@@ -14,7 +15,21 @@ namespace AttribLocs
    int pos = 0; 
    int tex_coord = 1;
    int normal = 2; 
+   int color = 3;
+   int instance_matrix = 4;
 }
+
+const GLfloat instance_colors[9][4] = {
+    {1.0f, 0.0f, 0.0f, 1.0f},  // Red
+    {0.0f, 1.0f, 0.0f, 1.0f},  // Green
+    {0.0f, 0.0f, 1.0f, 1.0f},  // Blue
+    {1.0f, 1.0f, 0.0f, 1.0f},  // Yellow
+    {1.0f, 0.0f, 1.0f, 1.0f},  // Magenta
+    {0.0f, 1.0f, 1.0f, 1.0f},  // Cyan
+    {0.5f, 0.5f, 0.5f, 1.0f},  // Gray
+    {1.0f, 0.5f, 0.0f, 1.0f},  // Orange
+    {0.0f, 0.5f, 1.0f, 1.0f}   // Light Blue
+};
 
 
 const unsigned int PRIMITIVE_RESTART_INDEX = 0xFFFFFFFF; // Max unsigned int
@@ -54,6 +69,44 @@ glm::vec3 normal(glm::mat3& M, int i, int j)
 
    return glm::normalize(glm::cross(dFdx, dFdy));
 }
+
+#pragma region Adding instance colors and matrix in the calls
+
+GLuint create_instanced_color_vbo()
+{
+    
+    // Generate and bind instance color VBO
+    GLuint colorVBO;
+    glGenBuffers(1, &colorVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(instance_colors), instance_colors, GL_STATIC_DRAW);
+
+    return colorVBO;  // Return the generated VBO ID
+}
+
+GLuint create_instanced_matrix_vbo()
+{
+    // Define 9 transformation matrices (each instance gets a unique position)
+    glm::mat4 instance_matrices[9];
+    for (int i = 0; i < 3; i++) {
+        for (int j = 0; j < 3; j++) {
+            int index = i * 3 + j;
+            instance_matrices[index] = glm::mat4(1.0f);  // Identity matrix
+            instance_matrices[index] = glm::translate(instance_matrices[index], glm::vec3(j * 20.0f - 20.0f, i * 20.0f - 20.0f, 0));
+        }
+    }
+
+    // Generate and bind the VBO
+    GLuint matrixVBO;
+    glGenBuffers(1, &matrixVBO);
+    glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(instance_matrices), instance_matrices, GL_STATIC_DRAW);
+
+    return matrixVBO; // Return the generated VBO ID
+}
+
+
+#pragma endregion
 
 #pragma region Create surface: primitive = GL_POINTS, only 1 attribute in VBO
 ////////////////////////////////////////////////////////////////////////////////
@@ -111,6 +164,29 @@ surf_vao create_surf_points_vao(int n)
 
    //Tell opengl how to get the attribute values out of the vbo (stride and offset).
    glVertexAttribPointer(AttribLocs::pos, 3, GL_FLOAT, false, 3*sizeof(float), 0);
+
+   GLuint colorVBO = create_instanced_color_vbo();
+
+   // Associate colors with an attribute in the shader (location 4)
+   glEnableVertexAttribArray(AttribLocs::color);
+   glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+   glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+   // Tell OpenGL this is an instanced attribute
+   glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+   // ---- CALL THE MATRIX SETUP FUNCTION ----
+   GLuint matrixVBO = create_instanced_matrix_vbo();
+
+   // Associate matrices with an attribute in the shader (location 3-6)
+   glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+   for (int i = 0; i < 4; i++) {
+       glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+       glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+           sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+       glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+   }
 
    return surf;
 }
@@ -182,6 +258,29 @@ surf_vao create_surf_triangles_vao(int n)
 
    //Tell opengl how to get the attribute values out of the vbo (stride and offset).
    glVertexAttribPointer(AttribLocs::pos, 3, GL_FLOAT, false, 3*sizeof(float), BUFFER_OFFSET(0));
+
+   GLuint colorVBO = create_instanced_color_vbo();
+
+   // Associate colors with an attribute in the shader (location 4)
+   glEnableVertexAttribArray(AttribLocs::color);
+   glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+   glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+   // Tell OpenGL this is an instanced attribute
+   glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+   // ---- CALL THE MATRIX SETUP FUNCTION ----
+   GLuint matrixVBO = create_instanced_matrix_vbo();
+
+   // Associate matrices with an attribute in the shader (location 3-6)
+   glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+   for (int i = 0; i < 4; i++) {
+       glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+       glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+           sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+       glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+   }
 
    glBindVertexArray(0); //unbind the vao
 
@@ -275,6 +374,31 @@ surf_vao create_surf_separate_points_vao(int n)
    glVertexAttribPointer(AttribLocs::pos, 3, GL_FLOAT, false, 3*sizeof(float), BUFFER_OFFSET(0));
    glVertexAttribPointer(AttribLocs::tex_coord, 2, GL_FLOAT, false, 2*sizeof(float), BUFFER_OFFSET(3*surf.num_vertices*sizeof(float)));
    glVertexAttribPointer(AttribLocs::normal, 3, GL_FLOAT, false, 3*sizeof(float), BUFFER_OFFSET((3+2)*surf.num_vertices*sizeof(float)));
+
+
+   GLuint colorVBO = create_instanced_color_vbo();
+
+   // Associate colors with an attribute in the shader (location 4)
+   glEnableVertexAttribArray(AttribLocs::color);
+   glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+   glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+   // Tell OpenGL this is an instanced attribute
+   glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+   // ---- CALL THE MATRIX SETUP FUNCTION ----
+   GLuint matrixVBO = create_instanced_matrix_vbo();
+
+   // Associate matrices with an attribute in the shader (location 3-6)
+   glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+   for (int i = 0; i < 4; i++) {
+       glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+       glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+           sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+       glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+   }
+
 
    glBindVertexArray(0); //unbind the vao
 
@@ -408,6 +532,31 @@ surf_vao create_surf_separate_vao(int n)
    glVertexAttribPointer(AttribLocs::tex_coord, 2, GL_FLOAT, false, 2*sizeof(float), BUFFER_OFFSET(3*surf.num_vertices*sizeof(float)));
    glVertexAttribPointer(AttribLocs::normal, 3, GL_FLOAT, false, 3*sizeof(float), BUFFER_OFFSET((3+2)*surf.num_vertices*sizeof(float)));
 
+
+   GLuint colorVBO = create_instanced_color_vbo();
+
+   // Associate colors with an attribute in the shader (location 4)
+   glEnableVertexAttribArray(AttribLocs::color);
+   glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+   glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+   // Tell OpenGL this is an instanced attribute
+   glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+   // ---- CALL THE MATRIX SETUP FUNCTION ----
+   GLuint matrixVBO = create_instanced_matrix_vbo();
+
+   // Associate matrices with an attribute in the shader (location 3-6)
+   glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+   for (int i = 0; i < 4; i++) {
+       glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+       glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+           sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+       glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+   }
+
+
    glBindVertexArray(0); //unbind the vao
 
    return surf;
@@ -512,6 +661,31 @@ surf_vao create_surf_interleaved_vao(int n)
    glVertexAttribPointer(AttribLocs::pos, 3, GL_FLOAT, false, stride, BUFFER_OFFSET(0));
    glVertexAttribPointer(AttribLocs::tex_coord, 2, GL_FLOAT, false, stride, BUFFER_OFFSET(3*sizeof(float)));
    glVertexAttribPointer(AttribLocs::normal, 3, GL_FLOAT, false, stride, BUFFER_OFFSET((3+2)*sizeof(float)));
+
+
+   GLuint colorVBO = create_instanced_color_vbo();
+
+   // Associate colors with an attribute in the shader (location 4)
+   glEnableVertexAttribArray(AttribLocs::color);
+   glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+   glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+   // Tell OpenGL this is an instanced attribute
+   glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+   // ---- CALL THE MATRIX SETUP FUNCTION ----
+   GLuint matrixVBO = create_instanced_matrix_vbo();
+
+   // Associate matrices with an attribute in the shader (location 3-6)
+   glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+   for (int i = 0; i < 4; i++) {
+       glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+       glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+           sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+       glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+   }
+
 
    glBindVertexArray(0); //unbind the vao
 
@@ -636,6 +810,31 @@ surf_vao create_indexed_surf_interleaved_vao(int n)
    glVertexAttribPointer(AttribLocs::tex_coord, 2, GL_FLOAT, false, stride, BUFFER_OFFSET(3*sizeof(float)));
    glVertexAttribPointer(AttribLocs::normal, 3, GL_FLOAT, false, stride, BUFFER_OFFSET((3+2)*sizeof(float)));
 
+
+   GLuint colorVBO = create_instanced_color_vbo();
+
+   // Associate colors with an attribute in the shader (location 4)
+   glEnableVertexAttribArray(AttribLocs::color);
+   glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+   glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+   // Tell OpenGL this is an instanced attribute
+   glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+   // ---- CALL THE MATRIX SETUP FUNCTION ----
+   GLuint matrixVBO = create_instanced_matrix_vbo();
+
+   // Associate matrices with an attribute in the shader (location 3-6)
+   glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+   for (int i = 0; i < 4; i++) {
+       glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+       glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+           sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+       glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+   }
+
+
    glBindVertexArray(0); //unbind the vao
 
    return surf;
@@ -754,6 +953,30 @@ surf_vao create_indexed_strip_surf_interleaved_vao(int n)
     glVertexAttribPointer(AttribLocs::pos, 3, GL_FLOAT, false, stride, BUFFER_OFFSET(0));
     glVertexAttribPointer(AttribLocs::tex_coord, 2, GL_FLOAT, false, stride, BUFFER_OFFSET(3 * sizeof(float)));
     glVertexAttribPointer(AttribLocs::normal, 3, GL_FLOAT, false, stride, BUFFER_OFFSET((3 + 2) * sizeof(float)));
+
+    GLuint colorVBO = create_instanced_color_vbo();
+
+    // Associate colors with an attribute in the shader (location 4)
+    glEnableVertexAttribArray(AttribLocs::color);
+    glBindBuffer(GL_ARRAY_BUFFER, colorVBO);
+    glVertexAttribPointer(AttribLocs::color, 4, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+    // Tell OpenGL this is an instanced attribute
+    glVertexAttribDivisor(AttribLocs::color, 1);
+
+
+    // ---- CALL THE MATRIX SETUP FUNCTION ----
+    GLuint matrixVBO = create_instanced_matrix_vbo();
+
+    // Associate matrices with an attribute in the shader (location 3-6)
+    glBindBuffer(GL_ARRAY_BUFFER, matrixVBO);
+    for (int i = 0; i < 4; i++) {
+        glEnableVertexAttribArray(AttribLocs::instance_matrix + i);
+        glVertexAttribPointer(AttribLocs::instance_matrix + i, 4, GL_FLOAT, GL_FALSE,
+            sizeof(glm::mat4), (void*)(sizeof(glm::vec4) * i));
+        glVertexAttribDivisor(AttribLocs::instance_matrix + i, 1);
+    }
+
 
     glBindVertexArray(0); //unbind the vao
 

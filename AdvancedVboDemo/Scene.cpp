@@ -77,6 +77,15 @@ void Scene::Display(GLFWwindow* window)
    glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 0.0f, 1.0f)) * glm::scale(glm::vec3(scale));
    glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(M));
 
+   surf[draw_surf].instance_count = 9;
+
+   /*if (draw_surf == 6) {
+       surf[draw_surf].instance_count = 9;
+   }
+   else {
+       surf[draw_surf].instance_count = 1;
+   }*/
+
    //Draw a surface from currently selected VAO
    glBindVertexArray(surf[draw_surf].vao);
    surf[draw_surf].Draw();
