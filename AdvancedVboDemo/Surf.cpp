@@ -16,6 +16,9 @@ namespace AttribLocs
    int normal = 2; 
 }
 
+
+const unsigned int PRIMITIVE_RESTART_INDEX = 0xFFFFFFFF; // Max unsigned int
+
 //The surface to draw.
 float sinc2D(const glm::vec2& p)
 {
@@ -689,41 +692,43 @@ GLuint create_indexed_strip_surf_interleaved_vbo(int n_grid)
 
 GLuint create_triangle_strip_index_buffer(int n_grid)
 {
+ 
+
     std::vector<unsigned int> surf_indices;
-    surf_indices.reserve((n_grid) * n_grid * 2); // Two indices per column and row
+    surf_indices.reserve((n_grid - 1) * n_grid * 2 + (n_grid - 2)); // Primitive restart rows
+
 
     unsigned int idx = 0;
-    for (int i = 0; i < n_grid; i++) // Iterate rows
+    for (int i = 0; i < n_grid - 1; i++)
     {
-        if (i > 0)
+        for (int j = 0; j < n_grid -1; j++)
         {
-            // Insert a degenerate triangle to connect strips
-            surf_indices.push_back(idx - n_grid);
-            surf_indices.push_back(idx);
+            surf_indices.push_back(idx + n_grid); 
+            surf_indices.push_back(idx);          
+            idx++;
         }
+        surf_indices.push_back(PRIMITIVE_RESTART_INDEX);
+        idx++;
 
-        for (int j = 0; j < n_grid; j++) // Iterate columns
-        {
-            // Follow your specified order: bottom vertex first, then top vertex
-            surf_indices.push_back(idx + n_grid); // Bottom row
-            surf_indices.push_back(idx);          // Top row
-
-            idx++; // Move to next column
-        }
     }
 
-    // Upload to EBO
+
     GLuint index_buffer;
     glGenBuffers(1, &index_buffer);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, index_buffer);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(unsigned int) * surf_indices.size(), surf_indices.data(), GL_STATIC_DRAW);
 
     return index_buffer;
+
 }
 
 surf_vao create_indexed_strip_surf_interleaved_vao(int n)
 {
     surf_vao surf;
+
+    glEnable(GL_PRIMITIVE_RESTART);
+    glPrimitiveRestartIndex(PRIMITIVE_RESTART_INDEX);
+
 
     //Generate vao id to hold the mapping from attrib variables in shader to memory locations in vbo
     glGenVertexArrays(1, &surf.vao);
@@ -733,7 +738,7 @@ surf_vao create_indexed_strip_surf_interleaved_vao(int n)
 
     GLuint vbo = create_indexed_strip_surf_interleaved_vbo(n);
     surf.mode = GL_TRIANGLE_STRIP;
-    const int num_triangles = (n) * n  * 2;
+    const int num_triangles = (n - 1) * n * 2 + (n - 2);
     surf.num_indices = num_triangles;
     surf.type = GL_UNSIGNED_INT;
 
