@@ -53,5 +53,6 @@ namespace Uniforms
    {
       extern int M; //model matrix
       extern int time;
+      extern float size;
    };
 };

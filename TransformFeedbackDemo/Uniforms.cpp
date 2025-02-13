@@ -25,6 +25,7 @@ namespace Uniforms
    {
       int M = 0; //model matrix
       int time = 1;
+      float size = 8.0f;
    };
 
    void Init()

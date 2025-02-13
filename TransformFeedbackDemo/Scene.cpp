@@ -40,7 +40,7 @@ GLuint shader_program = -1;
    //Ping-pong pairs of objects and buffers since we don't have simultaneous read/write access to VBOs.
    GLuint vao[2] = {-1, -1};
    GLuint vbo[2] = {-1, -1};
-   const int num_particles = 100000;
+   int num_particles = 100000;
    GLuint tfo[2] = { -1, -1 }; //transform feedback objects
    //Names of the VS out variables that should be captured by transform feedback
    const char *xform_feedback_varyings[] = { "pos_out", "vel_out", "age_out" };
@@ -61,6 +61,7 @@ GLuint shader_program = -1;
 
 float angle = 0.0f;
 float scale = 1.0f;
+float pointSizeConstant = 1.0f;
 bool recording = false;
 
 namespace Scene
@@ -99,6 +100,8 @@ void Scene::Display(GLFWwindow* window)
    //Set uniforms
    glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::scale(glm::vec3(scale));
    glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(M));
+
+   glUniform1f(Uniforms::UniformLocs::size, pointSizeConstant);
 
    glDepthMask(GL_FALSE); //Disable depth write for particles
 
@@ -206,6 +209,8 @@ void Scene::DrawGui(GLFWwindow* window)
 
    ImGui::SliderFloat("View angle", &angle, -glm::pi<float>(), +glm::pi<float>());
    ImGui::SliderFloat("Scale", &scale, -10.0f, +10.0f);
+   ImGui::SliderInt("Particle Number", &num_particles, 1, 100000);
+   ImGui::SliderFloat("Point Size constant", &pointSizeConstant, 0.1f, 10.0f);
    if (ImGui::Button("Show ImGui Demo Window"))
    {
       show_imgui_demo = true;

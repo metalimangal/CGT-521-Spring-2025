@@ -14,7 +14,7 @@ void main(void)
 
     float dist = length(p);
 
-    if (dist > 0.5) {
+    if (dist < 0.5) {
         discard;
     }
 

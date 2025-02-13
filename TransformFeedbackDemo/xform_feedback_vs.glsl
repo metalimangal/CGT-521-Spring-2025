@@ -1,6 +1,7 @@
 #version 440            
 layout(location = 0) uniform mat4 M;
 layout(location = 1) uniform float time;
+layout(location = 2) uniform float size = 50.0;
 
 layout(std140, binding = 0) uniform SceneUniforms
 {
@@ -33,11 +34,13 @@ vec3 velocity(vec3 p);
 //pseudorandom number
 vec3 hash( vec3 f );
 
+vec3 gravity = vec3(0.0, -0.5, 0.0);
+
 void main(void)
 {
 	//Draw current particles from vbo
 	gl_Position = PV*M*vec4(pos_attrib, 1.0);
-	gl_PointSize = 8.0;
+	gl_PointSize = size * abs(sin(time));
 
 	//Compute particle attributes for next frame
 	vel_out = velocity(pos_attrib);
@@ -50,7 +53,7 @@ void main(void)
 		vec3 seed = vec3(float(gl_VertexID), time/10.0, gl_Position.x); //seed for the random number generator
 		vec3 rand = hash(seed);
 		pos_out = vec3(2.0*rand.xy-vec2(1.0), -2.0).xzy;
-
+		
 		age_out = 500.0 + 1000.0*dot(rand,vec3(0.333));
 	}
 }
@@ -67,6 +70,17 @@ vec3 v(vec3 p)
 	return v0(p.xyz-t) + v0(p.yxz+t);
 } 
 
+vec3 magnetic_field(vec3 p)
+{
+	float r = length(p);  // Distance from the center
+	vec3 m = vec3(0.0, 1.0, 0.0); // Magnetic dipole moment along Y-axis
+
+	// Dipole field equation: B = (3(m?r)r - m r^2) / r^5
+	vec3 B = (3.0 * dot(m, p) * p - m * (r * r)) / pow(r, 5.0);
+
+	return B; // Velocity follows field lines
+}
+
 vec3 velocity(vec3 p) //fractal sum of basic vector field
 {
 	const int n = 5;
@@ -77,7 +91,9 @@ vec3 velocity(vec3 p) //fractal sum of basic vector field
 		octaves = octaves + v(scale*p)/scale;
 		scale*= 1.5;
 	}
-	return 0.5*octaves.xzy;
+	//return 0.5*octaves.xzy;
+
+	return 0.7 * magnetic_field(p);
 }
 
 
@@ -101,3 +117,4 @@ vec3 hash( vec3 f )
                           floatBitsToUint(f.y),
                           floatBitsToUint(f.z) ) );
 }
+

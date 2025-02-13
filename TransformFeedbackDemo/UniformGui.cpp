@@ -46,7 +46,7 @@ void UniformGuiBasic(GLuint program)
          GLint binding, tex_id;
          glGetUniformiv(program, loc, &binding);
          glGetIntegeri_v(GL_TEXTURE_BINDING_2D, binding, &tex_id);
-         ImGui::Image((void*)tex_id, ImVec2(256,256));
+         ImGui::Image((ImTextureID)tex_id, ImVec2(256,256));
       }
 
       /// 
@@ -238,7 +238,7 @@ void UniformGui(GLuint program)
                GLint binding, tex_id;
                glGetUniformiv(program, loc+i, &binding);
                glGetIntegeri_v(GL_TEXTURE_BINDING_2D, binding, &tex_id);
-               ImGui::Image((void*)tex_id, ImVec2(256,256));
+               ImGui::Image((ImTextureID)tex_id, ImVec2(256,256));
             }
          }
 
