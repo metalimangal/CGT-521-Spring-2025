@@ -13,6 +13,8 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "InstancingDemo", "Instancin
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TransformFeedbackDemo", "TransformFeedbackDemo\TransformFeedbackDemo.vcxproj", "{B8D6CA9A-3101-4235-9F87-1D3F37C162F8}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "FBO Demo", "FBO Demo\FBO Demo.vcxproj", "{B7029E77-4268-4F31-93D9-ABA957068AC1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -61,6 +63,14 @@ Global
 		{B8D6CA9A-3101-4235-9F87-1D3F37C162F8}.Release|x64.Build.0 = Release|x64
 		{B8D6CA9A-3101-4235-9F87-1D3F37C162F8}.Release|x86.ActiveCfg = Release|Win32
 		{B8D6CA9A-3101-4235-9F87-1D3F37C162F8}.Release|x86.Build.0 = Release|Win32
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Debug|x64.ActiveCfg = Debug|x64
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Debug|x64.Build.0 = Debug|x64
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Debug|x86.ActiveCfg = Debug|Win32
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Debug|x86.Build.0 = Debug|Win32
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Release|x64.ActiveCfg = Release|x64
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Release|x64.Build.0 = Release|x64
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Release|x86.ActiveCfg = Release|Win32
+		{B7029E77-4268-4F31-93D9-ABA957068AC1}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
