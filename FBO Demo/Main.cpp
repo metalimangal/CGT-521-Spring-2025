@@ -38,6 +38,7 @@ int main(int argc, char **argv)
 
    glfwSetFramebufferSizeCallback(window, Scene::framebuffer_size_callback);
    glfwSetMouseButtonCallback(window, Scene::mouse_callback);
+   glfwSetCursorPosCallback(window, Scene::cursor_position_callback);
 
    /* Make the window's context current */
    glfwMakeContextCurrent(window);

@@ -45,7 +45,6 @@ vec4 edge();
 vec4 vignette();
 vec4 glitch();
 vec4 gamma();
-vec4 swirl();
 vec4 pixelate();
 vec4 invert();
 
@@ -184,28 +183,6 @@ vec4 gamma()
    vec4 c = texelFetch(fbo_tex, ivec2(gl_FragCoord), 0);
    float g = 1.0/1.5;
    return pow(c, vec4(g,g,g,1.0));
-}
-
-vec4 swirl()
-{
-	// Use the interpolated texture coordinate.
-	vec2 uv = inData.tex_coord;
-	// Define the swirl center (usually at the middle of the screen).
-	vec2 center = vec2(0.5, 0.5);
-	// Compute offset from the center.
-	vec2 offset = uv - center;
-	// Compute the distance from the center.
-	float dist = length(offset);
-	// Calculate a swirl angle that increases with distance and is animated by time.
-	float angle = 0.3 * sin(time + dist * 20.0);
-	float s = sin(angle);
-	float c = cos(angle);
-	// Rotate the offset.
-	vec2 rotated = vec2(offset.x * c - offset.y * s, offset.x * s + offset.y * c);
-	// Compute the new UV coordinates.
-	vec2 swirledUV = center + rotated;
-	// Sample the FBO texture with the new UV.
-	return texture(fbo_tex, swirledUV);
 }
 
 vec4 pixelate()

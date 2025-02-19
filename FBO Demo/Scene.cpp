@@ -8,11 +8,14 @@
 
 #include <GL/glew.h>
 #include <GLFW/glfw3.h>
+#include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
 #include <glm/gtx/transform.hpp>
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 #include <iostream>
 #include <fstream>
 #include <sstream>
@@ -49,6 +52,18 @@ float angle = 0.0f;
 float scale = 1.0f;
 bool recording = false;
 
+bool isDrag = false;
+glm::vec3 dragStart;
+glm::vec3 dragOffset;
+float dragDepth = 0.0f;
+
+std::vector<glm::vec3> translations = {
+ glm::vec3(-0.5f, -0.5f, 0.0f),
+ glm::vec3(0.5f, -0.5f, 0.0f),
+ glm::vec3(-0.5f, 0.5f,  0.0f),
+ glm::vec3(0.5f, 0.5f,  0.0f)
+};
+
 namespace Scene
 {
    namespace Camera
@@ -74,39 +89,6 @@ namespace Scene
    int WindowHeight = InitWindowHeight;
 }
 
-class SceneObject {
-public:
-    glm::vec3 position;
-    glm::vec3 rotation; // Rotation in degrees for x, y, z axes
-    glm::vec3 scale;
-
-    SceneObject(const glm::vec3& pos = glm::vec3(0.0f),
-        const glm::vec3& rot = glm::vec3(0.0f),
-        const glm::vec3& scl = glm::vec3(1.0f))
-        : position(pos), rotation(rot), scale(scl) {}
-
-    glm::mat4 getModelMatrix() const {
-        glm::mat4 model = glm::mat4(1.0f);
-        model = glm::translate(model, position);
-        model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
-        model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
-        model = glm::scale(model, scale);
-        return model;
-    }
-};
-
-std::vector<SceneObject> sceneObjects;
-
-std::vector<SceneObject> initialObjects = {
-    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f)),
-    SceneObject(glm::vec3(1.5f, 0.0f, -2.0f), glm::vec3(0.0f, 45.0f, 0.0f), glm::vec3(0.5f)),
-    SceneObject(glm::vec3(-0.5f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f)),
-    SceneObject(glm::vec3(0.0f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f))
-};
-
-glm::vec3 newObjectPosition = glm::vec3(0.0f, 0.0f, 0.0f);
-
 
 void Scene::framebuffer_size_callback(GLFWwindow* window, int width, int height)
 {
@@ -125,7 +107,7 @@ void Scene::framebuffer_size_callback(GLFWwindow* window, int width, int height)
     glBindTexture(GL_TEXTURE_2D, 0);
 
     glBindTexture(GL_TEXTURE_2D, pick_tex);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
     glBindTexture(GL_TEXTURE_2D, 0);
 
     // If you also use a renderbuffer for depth (see Scene::Init),
@@ -165,13 +147,56 @@ void Scene::mouse_callback(GLFWwindow* window, int button, int action, int mods)
 
         if (pickedID == 0)
             selectedInstanceID = 0;
-        else
+        else {
             selectedInstanceID = pickedID;
-        std::cout << "Selected instance ID: " << selectedInstanceID << std::endl;
+            isDrag = true;
 
+            dragStart = translations[selectedInstanceID - 1];
+
+            glm::vec4 viewport(0, 0, windowWidth, windowHeight);
+            glm::vec3 objScreen = glm::project(dragStart, Scene::Camera::V, Scene::Camera::P, viewport);
+            dragDepth = objScreen.z; // Save the depth.
+
+            // Construct a screen-space vector for the mouse position using the saved depth.
+            glm::vec3 mouseScreenPos(mouseX, windowWidth - mouseY, dragDepth);
+
+            // Unproject to get the mouse's world coordinate.
+            glm::vec3 mouseWorld = glm::unProject(mouseScreenPos, Scene::Camera::V, Scene::Camera::P, viewport);
+
+            // Compute and store the offset between the object's world position and the mouse's world position.
+            dragOffset = dragStart - mouseWorld;
         }
 
+        std::cout << "Selected instance ID: " << selectedInstanceID << std::endl;
+
+    }
+    else if (action == GLFW_RELEASE)
+    {
+        isDrag = false;
+
+    }
+     
 }
+
+void Scene::cursor_position_callback(GLFWwindow* window, double x, double y)
+{
+    if (isDrag && selectedInstanceID != 0)
+    {
+        int fbWidth, fbHeight;
+        glfwGetFramebufferSize(window, &fbWidth, &fbHeight);
+        glm::vec4 viewport(0, 0, fbWidth, fbHeight);
+
+        // Construct the current screen-space vector for the mouse.
+        glm::vec3 mouseScreenPos(static_cast<float>(x), fbHeight - static_cast<float>(y), dragDepth);
+
+        // Unproject the mouse screen position to get the new world coordinate.
+        glm::vec3 newMouseWorld = glm::unProject(mouseScreenPos, Scene::Camera::V, Scene::Camera::P, viewport);
+
+        // Update the translation of the dragged instance so that the original offset is preserved.
+        translations[selectedInstanceID - 1] = newMouseWorld + dragOffset;
+    }
+}
+
 
 // This function gets called every time the scene gets redisplayed
 void Scene::Display(GLFWwindow* window)
@@ -204,12 +229,7 @@ void Scene::Display(GLFWwindow* window)
 
    //Draw mesh
    glBindVertexArray(mesh_data.mVao);
-   std::vector<glm::vec3> translations = {
-    glm::vec3(-0.5f, -0.5f, 0.0f),
-    glm::vec3(0.5f, -0.5f, 0.0f),
-    glm::vec3(-0.5f, 0.5f,  0.0f),
-    glm::vec3(0.5f, 0.5f,  0.0f)
-   };
+
 
    int objectID = 1;
    // For each mesh instance, update the model matrix and draw.
@@ -432,7 +452,7 @@ void Scene::Init()
    // Create the pick texture.
    glGenTextures(1, &pick_tex);
    glBindTexture(GL_TEXTURE_2D, pick_tex);
-   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, Scene::InitWindowWidth, Scene::InitWindowHeight, 0, GL_RGBA, GL_FLOAT, nullptr);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, Scene::InitWindowWidth, Scene::InitWindowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, nullptr);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
