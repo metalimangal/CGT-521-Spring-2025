@@ -5,6 +5,8 @@ layout(binding = 1) uniform sampler2D fbo_tex;
 layout(location = 1) uniform float time;
 layout(location = 2) uniform int pass;
 layout(location = 3) uniform int mode;
+layout(location = 4) uniform int ObjectID;
+layout(location = 5) uniform int selectedID;
 
 layout(std140, binding = 0) uniform SceneUniforms
 {
@@ -35,13 +37,17 @@ in VertexData
    vec3 nw;   //world-space normal vector
 } inData;   //block is named 'inData'
 
-out vec4 fragcolor; //the output color for this fragment    
+layout(location = 0) out vec4 fragcolor;
+layout(location = 1) out vec4 pickcolor;
 
 vec4 blur();
 vec4 edge();
 vec4 vignette();
 vec4 glitch();
 vec4 gamma();
+vec4 swirl();
+vec4 pixelate();
+vec4 invert();
 
 void main(void)
 {   
@@ -66,6 +72,24 @@ void main(void)
 		vec4 specular_term = atten*ks*Ls*pow(max(0.0, dot(rw, vw)), shininess);
 
 		fragcolor = ambient_term + diffuse_term + specular_term;
+
+		if (ObjectID == selectedID && selectedID != 0) {
+			float pulse = 0.5 + 0.5 * sin(time * 5.0);
+			fragcolor.rgb *= pulse;
+		}
+
+		if (ObjectID == 1)
+			pickcolor = vec4(1.0, 0.0, 0.0, 1.0); 
+		else if (ObjectID == 2)
+			pickcolor = vec4(0.0, 1.0, 0.0, 1.0); 
+		else if (ObjectID == 3)
+			pickcolor = vec4(0.0, 0.0, 1.0, 1.0); 
+		else if (ObjectID == 4)
+			pickcolor = vec4(1.0, 1.0, 0.0, 1.0); 
+		else
+			pickcolor = vec4(1.0, 1.0, 1.0, 1.0);
+
+
 	}
     if(pass == 1)
 	{
@@ -92,6 +116,10 @@ void main(void)
 		else if(mode == 5)
 		{
 			fragcolor = gamma();
+		}
+		else if (mode == 6)
+		{
+			fragcolor = invert();
 		}
 	}
 }
@@ -156,4 +184,41 @@ vec4 gamma()
    vec4 c = texelFetch(fbo_tex, ivec2(gl_FragCoord), 0);
    float g = 1.0/1.5;
    return pow(c, vec4(g,g,g,1.0));
+}
+
+vec4 swirl()
+{
+	// Use the interpolated texture coordinate.
+	vec2 uv = inData.tex_coord;
+	// Define the swirl center (usually at the middle of the screen).
+	vec2 center = vec2(0.5, 0.5);
+	// Compute offset from the center.
+	vec2 offset = uv - center;
+	// Compute the distance from the center.
+	float dist = length(offset);
+	// Calculate a swirl angle that increases with distance and is animated by time.
+	float angle = 0.3 * sin(time + dist * 20.0);
+	float s = sin(angle);
+	float c = cos(angle);
+	// Rotate the offset.
+	vec2 rotated = vec2(offset.x * c - offset.y * s, offset.x * s + offset.y * c);
+	// Compute the new UV coordinates.
+	vec2 swirledUV = center + rotated;
+	// Sample the FBO texture with the new UV.
+	return texture(fbo_tex, swirledUV);
+}
+
+vec4 pixelate()
+{
+	float blockSize = 8.0;
+	vec2 resolution = vec2(textureSize(fbo_tex, 0));
+	vec2 uv = inData.tex_coord;
+	vec2 pixelatedUV = floor(uv * resolution / blockSize) * blockSize / resolution;
+	return texture(fbo_tex, pixelatedUV);
+}
+
+vec4 invert()
+{
+	vec4 c = texelFetch(fbo_tex, ivec2(gl_FragCoord), 0);
+	return vec4(vec3(1.0) - c.rgb, c.a);
 }

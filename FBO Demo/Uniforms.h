@@ -55,5 +55,7 @@ namespace Uniforms
       extern int time;
       extern int pass;
       extern int mode;
+      extern int ObjectID;
+      extern int selectedID;
    };
 };

@@ -9,6 +9,8 @@ namespace Scene
    void Idle();
    void Init();
    void ReloadShader();
+   void framebuffer_size_callback(GLFWwindow* window, int width, int height);
+   void mouse_callback(GLFWwindow* window, int button, int action, int mods);
 
    extern const int InitWindowWidth;
    extern const int InitWindowHeight;

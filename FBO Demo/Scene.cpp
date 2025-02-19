@@ -39,6 +39,10 @@ MeshData mesh_data;
 
 GLuint fbo = -1;
 GLuint fbo_tex = -1;
+GLuint pick_tex = -1;
+int selectedInstanceID = 0;
+
+GLuint rbo = 0;
 int shader_mode = 0;
 
 float angle = 0.0f;
@@ -70,6 +74,104 @@ namespace Scene
    int WindowHeight = InitWindowHeight;
 }
 
+class SceneObject {
+public:
+    glm::vec3 position;
+    glm::vec3 rotation; // Rotation in degrees for x, y, z axes
+    glm::vec3 scale;
+
+    SceneObject(const glm::vec3& pos = glm::vec3(0.0f),
+        const glm::vec3& rot = glm::vec3(0.0f),
+        const glm::vec3& scl = glm::vec3(1.0f))
+        : position(pos), rotation(rot), scale(scl) {}
+
+    glm::mat4 getModelMatrix() const {
+        glm::mat4 model = glm::mat4(1.0f);
+        model = glm::translate(model, position);
+        model = glm::rotate(model, rotation.x, glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, rotation.y, glm::vec3(0.0f, 1.0f, 0.0f));
+        model = glm::rotate(model, rotation.z, glm::vec3(0.0f, 0.0f, 1.0f));
+        model = glm::scale(model, scale);
+        return model;
+    }
+};
+
+std::vector<SceneObject> sceneObjects;
+
+std::vector<SceneObject> initialObjects = {
+    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f)),
+    SceneObject(glm::vec3(1.5f, 0.0f, -2.0f), glm::vec3(0.0f, 45.0f, 0.0f), glm::vec3(0.5f)),
+    SceneObject(glm::vec3(-0.5f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f)),
+    SceneObject(glm::vec3(0.0f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f))
+};
+
+glm::vec3 newObjectPosition = glm::vec3(0.0f, 0.0f, 0.0f);
+
+
+void Scene::framebuffer_size_callback(GLFWwindow* window, int width, int height)
+{
+    // Update the scene dimensions.
+    Scene::WindowWidth = width;
+    Scene::WindowHeight = height;
+    Scene::Camera::Aspect = static_cast<float>(width) / static_cast<float>(height);
+    Scene::Camera::UpdateP();
+
+    // Update the viewport.
+    glViewport(0, 0, width, height);
+
+    // Reallocate the FBO texture to the new size.
+    glBindTexture(GL_TEXTURE_2D, fbo_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    glBindTexture(GL_TEXTURE_2D, pick_tex);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, width, height, 0, GL_RGBA, GL_FLOAT, nullptr);
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+    // If you also use a renderbuffer for depth (see Scene::Init),
+    // re-create or update its storage similarly.
+
+    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+}
+
+void Scene::mouse_callback(GLFWwindow* window, int button, int action, int mods) {
+    if (button == GLFW_MOUSE_BUTTON_LEFT && action == GLFW_PRESS) {
+        double mouseX, mouseY;
+        glfwGetCursorPos(window, &mouseX, &mouseY);
+        int windowWidth, windowHeight;
+        glfwGetFramebufferSize(window, &windowWidth, &windowHeight);
+        int readX = static_cast<int>(mouseX);
+        int readY = windowHeight - static_cast<int>(mouseY);
+
+        GLubyte buffer[4] = { 0, 0, 0, 0 };
+        glBindFramebuffer(GL_FRAMEBUFFER, fbo);
+        glReadBuffer(GL_COLOR_ATTACHMENT1);
+        glPixelStorei(GL_PACK_ALIGNMENT, 1);
+        glReadPixels(readX, readY, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, buffer);
+        glBindFramebuffer(GL_FRAMEBUFFER, 0);
+        int pickedID = 0;
+        if (buffer[0] == 255 && buffer[1] == 0 && buffer[2] == 0)
+            pickedID = 1;
+        else if (buffer[0] == 0 && buffer[1] == 255 && buffer[2] == 0)
+            pickedID = 2;
+        else if (buffer[0] == 0 && buffer[1] == 0 && buffer[2] == 255)
+            pickedID = 3;
+        else if (buffer[0] == 255 && buffer[1] == 255 && buffer[2] == 0)
+            pickedID = 4;
+        else
+            pickedID = 0;
+
+        if (pickedID == 0)
+            selectedInstanceID = 0;
+        else
+            selectedInstanceID = pickedID;
+        std::cout << "Selected instance ID: " << selectedInstanceID << std::endl;
+
+        }
+
+}
 
 // This function gets called every time the scene gets redisplayed
 void Scene::Display(GLFWwindow* window)
@@ -80,8 +182,6 @@ void Scene::Display(GLFWwindow* window)
 
    glUseProgram(shader_program);
    //Set uniforms
-   glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
-   glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(M));
 
    ////////////////////////////////////////////////////////////////////////////
    //Render pass 0
@@ -93,7 +193,8 @@ void Scene::Display(GLFWwindow* window)
    //Pass 0: scene will be rendered into fbo attachment
    glUniform1i(Uniforms::UniformLocs::pass, 0);
    glBindFramebuffer(GL_FRAMEBUFFER, fbo); // Render to FBO.
-   glDrawBuffer(GL_COLOR_ATTACHMENT0); //Out variable in frag shader will be written to the texture attached to GL_COLOR_ATTACHMENT0.
+   GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+   glDrawBuffers(2, attachments);
 
    //Make the viewport match the FBO texture size.
    glViewport(0, 0, Scene::WindowWidth, Scene::WindowHeight);
@@ -103,7 +204,30 @@ void Scene::Display(GLFWwindow* window)
 
    //Draw mesh
    glBindVertexArray(mesh_data.mVao);
-   glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+   std::vector<glm::vec3> translations = {
+    glm::vec3(-0.5f, -0.5f, 0.0f),
+    glm::vec3(0.5f, -0.5f, 0.0f),
+    glm::vec3(-0.5f, 0.5f,  0.0f),
+    glm::vec3(0.5f, 0.5f,  0.0f)
+   };
+
+   int objectID = 1;
+   // For each mesh instance, update the model matrix and draw.
+   for (const glm::vec3& offset : translations)
+   {
+
+       glm::mat4 M = glm::translate(offset) *
+           glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) *
+           glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
+       glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, GL_FALSE, glm::value_ptr(M));
+
+       glUniform1i(Uniforms::UniformLocs::ObjectID, objectID);
+       glUniform1i(Uniforms::UniformLocs::selectedID, selectedInstanceID);
+
+       // Draw the mesh instance.
+       glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+       objectID++;
+   }
 
 
    ////////////////////////////////////////////////////////////////////////////
@@ -185,7 +309,10 @@ void Scene::DrawGui(GLFWwindow* window)
    ImGui::InputText("Video filename", video_filename, filename_len);
 
    //Show fbo_tex for debugging purposes. This is highly recommended for multipass rendering.
+   ImGui::Text("FBO Texture:");
    ImGui::Image((ImTextureID)fbo_tex, ImVec2(128.0f, 128.0f), ImVec2(0.0, 1.0), ImVec2(1.0, 0.0));
+   ImGui::Text("Pick Texture:");
+   ImGui::Image((ImTextureID)pick_tex, ImVec2(128.0f, 128.0f), ImVec2(0.0f, 1.0f), ImVec2(1.0f, 0.0f));
 
    ImGui::SliderFloat("View angle", &angle, -glm::pi<float>(), +glm::pi<float>());
    ImGui::SliderFloat("Scale", &scale, -10.0f, +10.0f);
@@ -196,7 +323,9 @@ void Scene::DrawGui(GLFWwindow* window)
    ImGui::RadioButton("Edge detect", &shader_mode, 2); ImGui::SameLine();
    ImGui::RadioButton("Vignette", &shader_mode, 3); ImGui::SameLine();
    ImGui::RadioButton("Glitch", &shader_mode, 4); ImGui::SameLine();
-   ImGui::RadioButton("Gamma", &shader_mode, 5);
+   ImGui::RadioButton("Gamma", &shader_mode, 5); ImGui::SameLine();
+   ImGui::RadioButton("Custom", &shader_mode, 6); 
+
    glUniform1i(Uniforms::UniformLocs::mode, shader_mode);
 
    ImGui::SliderFloat("View angle", &angle, -glm::pi<float>(), +glm::pi<float>());
@@ -300,8 +429,18 @@ void Scene::Init()
    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
    glBindTexture(GL_TEXTURE_2D, 0);
 
+   // Create the pick texture.
+   glGenTextures(1, &pick_tex);
+   glBindTexture(GL_TEXTURE_2D, pick_tex);
+   glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA32F, Scene::InitWindowWidth, Scene::InitWindowHeight, 0, GL_RGBA, GL_FLOAT, nullptr);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+   glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+   glBindTexture(GL_TEXTURE_2D, 0);
+
    //Create renderbuffer for depth.
-   GLuint rbo = 0;
+
    glGenRenderbuffers(1, &rbo);
    glBindRenderbuffer(GL_RENDERBUFFER, rbo);
    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Scene::InitWindowWidth, Scene::InitWindowHeight);
@@ -311,8 +450,13 @@ void Scene::Init()
    glBindFramebuffer(GL_FRAMEBUFFER, fbo);
    //attach the texture we just created to color attachment 1
    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo_tex, 0);
+   glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, pick_tex, 0);
+
    //attach depth renderbuffer to depth attachment
    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rbo); 
+
+   GLuint attachments[2] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1 };
+   glDrawBuffers(2, attachments);
    //unbind the fbo
    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 

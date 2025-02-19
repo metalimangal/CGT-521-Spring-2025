@@ -2,6 +2,8 @@
 layout(location = 0) uniform mat4 M;
 layout(location = 1) uniform float time;
 layout(location = 2) uniform int pass = 0;
+layout(location = 3) uniform int mode;
+layout(location = 4) uniform int ObjectID;
 
 layout(std140, binding = 0) uniform SceneUniforms
 {

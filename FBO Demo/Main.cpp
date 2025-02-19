@@ -8,6 +8,7 @@
 #include "imgui_impl_opengl3.h"
 
 
+
 //C++ programs start executing in the main() function.
 int main(int argc, char **argv)
 {
@@ -35,6 +36,9 @@ int main(int argc, char **argv)
    //Register callback functions with glfw. 
    Callbacks::Register(window);
 
+   glfwSetFramebufferSizeCallback(window, Scene::framebuffer_size_callback);
+   glfwSetMouseButtonCallback(window, Scene::mouse_callback);
+
    /* Make the window's context current */
    glfwMakeContextCurrent(window);
 
@@ -46,9 +50,11 @@ int main(int argc, char **argv)
    ImGui_ImplGlfw_InitForOpenGL(window, true);
    ImGui_ImplOpenGL3_Init("#version 150");
 
+
    /* Loop until the user closes the window */
    while (!glfwWindowShouldClose(window))
    {
+
       Scene::Idle();
       Scene::Display(window);
 

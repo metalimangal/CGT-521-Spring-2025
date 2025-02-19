@@ -27,6 +27,8 @@ namespace Uniforms
       int time = 1;
       int pass = 2;
       int mode = 3;
+      int ObjectID = 4;
+      int selectedID = 5;
    };
 
    void Init()
