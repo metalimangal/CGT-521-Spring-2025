@@ -60,6 +60,7 @@ float sdBox( vec3 p, vec3 b );
 float sdTorus(vec3 p, vec2 t);
 float sdBoxFrame(vec3 p, vec3 b, float e);
 float sdCone(vec3 p, vec2 c, float h);
+float sdDeathStar(vec3 p2, float ra, float rb, float d);
 
 //shape modifiers
 float opUnion( float d1, float d2 ) { return min(d1,d2); }
@@ -131,7 +132,7 @@ vec4 raycast_sdf_scene(vec3 rayStart, vec3 rayStop)
 float dist_to_scene(vec3 pos)
 {
 	vec3 sphere_cen = vec3(0.5);
-	vec3 torus_cen = vec3(0.5, -0.5, -0.5);
+	vec3 torus_cen = vec3(0.5, -0.5 * sin(time), -0.5 * cos(time));
 	float d1 = sdSphere(pos-sphere_cen, 0.5);
 	float d2 = sdBox(pos, vec3(0.5, 0.5, 0.1));
 	float d3 = sdTorus(pos - torus_cen, vec2(0.1));
@@ -216,4 +217,19 @@ float sdCone(vec3 p, vec2 c, float h)
 	float d = min(dot(a, a), dot(b, b));
 	float s = max(k * (w.x * q.y - w.y * q.x), k * (w.y - q.y));
 	return sqrt(d) * sign(s);
+}
+
+float sdDeathStar(vec3 p2, float ra, float rb, float d)
+{
+	// sampling independent computations (only depend on shape)
+	float a = (ra * ra - rb * rb + d * d) / (2.0 * d);
+	float b = sqrt(max(ra * ra - a * a, 0.0));
+
+	// sampling dependant computations
+	vec2 p = vec2(p2.x, length(p2.yz));
+	if (p.x * b - p.y * a > d * max(b - p.y, 0.0))
+		return length(p - vec2(a, b));
+	else
+		return max((length(p) - ra),
+			-(length(p - vec2(d, 0.0)) - rb));
 }
