@@ -4,7 +4,7 @@ layout(location = 1) uniform float time;
 layout(location = 2) uniform int pass;
 layout(location = 3) uniform int mode = 1;
 layout(location = 4) uniform vec4 slider = vec4(0.0);
-
+layout(location = 6) uniform float animSpeed;
 layout(std140, binding = 0) uniform SceneUniforms
 {
 	mat4 PV;	//camera projection * view matrix
@@ -53,6 +53,8 @@ vec3 normal(vec3 pos);
 //Computes Phong lighting
 vec4 lighting(vec3 pos, vec3 rayDir);
 
+//Shadow
+float softshadow( vec3 ro, vec3 rd, float mint, float maxt, float k );
 
 //shape function declarations
 float sdSphere( vec3 p, float s );
@@ -64,6 +66,12 @@ float sdDeathStar(vec3 p2, float ra, float rb, float d);
 
 //shape modifiers
 float opUnion( float d1, float d2 ) { return min(d1,d2); }
+float opSubtraction(float d1, float d2) {
+    return max(d1, -d2);
+}
+float opIntersection(float d1, float d2) {
+    return max(d1, d2);
+}
 
 // For more distance functions see
 // http://iquilezles.org/www/articles/distfunctions/distfunctions.htm
@@ -87,9 +95,9 @@ void main(void)
 		//fragcolor = vec4(inData.pw, 1.0); //draw cube front faces
 		//return;
 
-      vec3 rayStart = inData.pw;
+        vec3 rayStart = inData.pw;
 		vec3 rayStop = texelFetch(backface_tex, ivec2(gl_FragCoord.xy), 0).xyz;
-      fragcolor = raycast_sdf_scene(rayStart, rayStop);
+        fragcolor = raycast_sdf_scene(rayStart, rayStop);
 
 		//gamma
 		fragcolor = pow(fragcolor, vec4(0.45, 0.45, 0.45, 1.0));
@@ -128,21 +136,44 @@ vec4 raycast_sdf_scene(vec3 rayStart, vec3 rayStop)
 	return sky_color(rayDir);
 }
 
-//This function defines the scene
+// Define a flag to enable or disable sin(time) usage
+bool useSinTime = true;  // Set this flag to true or false to control the behavior
+
+// Function to compute sin(time) if enabled
+float sinTimeEffect(float value)
+{
+    return useSinTime ? sin(time*animSpeed) : 0.0;
+}
+
 float dist_to_scene(vec3 pos)
 {
-	vec3 sphere_cen = vec3(0.5);
-	vec3 torus_cen = vec3(0.5, -0.5 * sin(time), -0.5 * cos(time));
-	float d1 = sdSphere(pos-sphere_cen, 0.5);
-	float d2 = sdBox(pos, vec3(0.5, 0.5, 0.1));
-	float d3 = sdTorus(pos - torus_cen, vec2(0.1));
-	vec3 behindOffset = vec3(0.0, 0.0, -0.3 * sin(time));
-	float d4 = sdBoxFrame(pos - behindOffset, vec3(0.5, 0.5, 0.1), 0.05);
-	float d5 = sdCone(pos - behindOffset, vec2(0.2, 0.75), 0.9);
+    // Define the centers of the objects
+    vec3 sphere_cen = vec3(0.2, -0.7, 0.0);
+    vec3 torus_cen = vec3(0.5 * sinTimeEffect(0.0), 0.5, -0.5 * sinTimeEffect(0.0));
+    vec3 deathStarOffset = vec3(0.0, 0.3, -0.3 * sinTimeEffect(0.0));
 
+    // Define independent offsets for each behind shape
+    vec3 behindOffset1 = vec3(0.4, 0.1, -0.3 * sinTimeEffect(0.0)); // For BoxFrame
+    vec3 behindOffset2 = vec3(0.0, 0.0, -0.3 * sinTimeEffect(0.0)); // For Cone
+    vec3 behindOffset3 = vec3(-0.5, -0.5, 0.0); 
 
-	return opUnion(d1, opUnion(d2, opUnion(d3, opUnion(d4, d5))));
+    // Calculate distances for each shape
+    float d1 = sdSphere(pos - sphere_cen, 0.2);
+    float d2 = sdBox(pos - behindOffset3, vec3(0.5, 0.1, 0.1));
+    float d3 = sdTorus(pos - torus_cen, vec2(0.1));
+    float d4 = sdBoxFrame(pos - behindOffset1, vec3(0.5, 0.5, 0.1), 0.05);
+    float d5 = sdCone(pos - behindOffset2, vec2(0.5, 1.75), 1.9);
+    float d6 = sdDeathStar(pos - deathStarOffset, 0.5, 0.2, 0.3);
+
+	float coneSphereSub = opSubtraction(d5, d1);
+	float boxSpehereInt = opIntersection(d6, d3);
+
+    
+    // Return the final union of all distances
+    return opUnion(d2, opUnion(boxSpehereInt, opUnion(d4, coneSphereSub)));
 }
+
+
 
 //compute lighting on the intersected surface
 vec4 lighting(vec3 pos, vec3 rayDir)
@@ -151,14 +182,33 @@ vec4 lighting(vec3 pos, vec3 rayDir)
 
    vec3 nw = normal(pos);			//world-space unit normal vector
    vec3 lw = normalize(light_w.xyz - pos);	//world-space unit light vector
-   vec4 diffuse_term = kd*Ld*max(0.0, dot(nw, lw));
+   
+   float shadowFactor = softshadow(pos + nw * 0.02, lw, 0.02, 2.0, 16.0); // Offset along normal
+   
+   vec4 diffuse_term = kd*Ld*max(0.0, dot(nw, lw))* shadowFactor ;
 
    vec3 vw = -rayDir;	//world-space unit view vector
    vec3 rw = reflect(-lw, nw);	//world-space unit reflection vector
 
-   vec4 specular_term = ks*Ls*pow(max(0.0, dot(rw, vw)), shininess);
+   vec4 specular_term = ks*Ls*pow(max(0.0, dot(rw, vw)), shininess) * shadowFactor;
 
    return ambient_term + diffuse_term + specular_term;
+}
+
+
+float softshadow( vec3 ro, vec3 rd, float mint, float maxt, float k )
+{
+    float res = 1.0;
+    float t = mint;
+    for( int i=0; i<256 && t<maxt; i++ )
+    {
+        float h = dist_to_scene(ro + rd*t);
+        if( h<0.001 )
+            return 0.0;
+        res = min( res, k*h/t );
+        t += h;
+    }
+    return res;
 }
 
 //normal vector of the shape we are drawing.
@@ -176,7 +226,33 @@ vec3 normal(vec3 pos)
 
 vec4 sky_color(vec3 dir)
 {
-   return vec4(0.0);
+	//vec3 topColor = vec3(0.2, 0.0, 0.5);		//purple
+    //vec3 bottomColor = vec3(1.0, 0.4, 0.1);		//orange
+
+	vec3 topColor = vec3(0.2, 0.0, 0.5);		//purple
+    vec3 bottomColor = vec3(1.0, 0.4, 0.1);		//orange
+
+	float t = pow(0.5 * (dir.y + 1.0), 0.5); 
+	vec3 sky = bottomColor * (1.0 - t) + topColor * t;
+	
+
+	// Starfield generation
+    float starDensity = 10.0;  // Adjust for more/less stars
+    vec2 uv = fract(dir.xz * starDensity);
+    float stars = step(0.98, fract(sin(dot(uv, vec2(13, 79))) * 43758.5453));
+
+    // Sinusoidal twinkle effect
+    float flicker = 0.5 + 0.5 * sin(time * 5.0 + dot(uv, vec2(10.0, 10.0)));
+    stars *= flicker;
+
+    // Add stars to sky
+    sky += vec3(stars);
+
+    return vec4(sky, 1.0); // Return color with full opacity
+   
+   
+   //return vec4(0.0);
+   
 }
 
 float sdSphere( vec3 p, float s )
