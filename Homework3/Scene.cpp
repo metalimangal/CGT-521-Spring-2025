@@ -34,14 +34,19 @@ static const std::string vertex_shader("template_vs.glsl");
 static const std::string fragment_shader("template_fs.glsl");
 GLuint shader_program = -1;
 
-static const std::string mesh_name = "Amago0.obj";
+static const std::string mesh_name = "teapot.obj";
 static const std::string texture_name = "AmagoT.bmp";
+
+static bool enableF = true;
+static bool enableD = true;
+static bool enableG = true;
 
 GLuint texture_id = -1; //Texture map for mesh
 MeshData mesh_data;
 
 float angle = 0.0f;
 float scale = 1.0f;
+glm::vec3 rotationEuler = glm::vec3(0.0f, 0.0f, 0.0f);
 bool recording = false;
 
 namespace Scene
@@ -79,11 +84,26 @@ void Scene::Display(GLFWwindow* window)
    glBindTextureUnit(0, texture_id);
 
    //Set uniforms
-   glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
+   //glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
+   glm::mat4 M =
+       glm::rotate(rotationEuler.x, glm::vec3(1.0f, 0.0f, 0.0f)) *
+       glm::rotate(rotationEuler.y, glm::vec3(0.0f, 1.0f, 0.0f)) *
+       glm::rotate(rotationEuler.z, glm::vec3(0.0f, 0.0f, 1.0f)) *
+       glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
+
    glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(M));
 
+   glUniform1i(Uniforms::UniformLocs::enableF, enableF);
+   glUniform1i(Uniforms::UniformLocs::enableD, enableD);
+   glUniform1i(Uniforms::UniformLocs::enableG, enableG);
+
+   glBindBuffer(GL_UNIFORM_BUFFER, Uniforms::material_ubo);
+   glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Uniforms::MaterialData), &Uniforms::MaterialData);
+   glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
    glBindVertexArray(mesh_data.mVao);
-   glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+   //glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+   mesh_data.DrawMesh();
    //For meshes with multiple submeshes use mesh_data.DrawMesh(); 
 
    DrawGui(window);
@@ -128,7 +148,7 @@ void Scene::DrawGui(GLFWwindow* window)
          recording = true;
          const int fps = 60;
          const int bitrate = 4000000;
-         VideoRecorder::Start(video_filename, w, h, fps, bitrate); //Uses ffmpeg
+         VideoRecorder::Start(video_filename, w, h, fps, bitrate); //Uses ffmpeg 
       }
    }
    else
@@ -144,7 +164,38 @@ void Scene::DrawGui(GLFWwindow* window)
 
 
    ImGui::SliderFloat("View angle", &angle, -glm::pi<float>(), +glm::pi<float>());
+   ImGui::SliderFloat3("Rotation (XYZ)", glm::value_ptr(rotationEuler), -glm::pi<float>(), glm::pi<float>());
+
+
    ImGui::SliderFloat("Scale", &scale, -10.0f, +10.0f);
+   ImGui::Checkbox("Enable Fresnel (F)", &enableF);
+   ImGui::Checkbox("Enable Distribution (D)", &enableD);
+   ImGui::Checkbox("Enable Geometry (G)", &enableG);
+
+   ImGui::Begin("Material Settings");
+
+   // Ambient color (ka)
+   ImGui::ColorEdit4("Ambient (ka)", glm::value_ptr(Uniforms::MaterialData.ka));
+
+   // Diffuse color (kd)
+   ImGui::ColorEdit4("Diffuse (kd)", glm::value_ptr(Uniforms::MaterialData.kd));
+
+   // Specular color (ks)
+   ImGui::ColorEdit4("Specular (ks)", glm::value_ptr(Uniforms::MaterialData.ks));
+
+   // Shininess slider
+   ImGui::SliderFloat("Shininess", &Uniforms::MaterialData.shininess, 1.0f, 128.0f);
+
+   // Eta (refractive index)
+   ImGui::SliderFloat("Eta (Refractive Index)", &Uniforms::MaterialData.eta, 1.0f, 20.0f);
+
+   // Roughness (m in Cook-Torrance)
+   ImGui::SliderFloat("Roughness (m)", &Uniforms::MaterialData.roughness, 0.01f, 1.0f);
+
+   ImGui::End();
+
+
+
    if (ImGui::Button("Show ImGui Demo Window"))
    {
       show_imgui_demo = true;

@@ -36,9 +36,9 @@ out vec4 fragcolor; //the output color for this fragment
 void main(void)
 {   
    //Compute per-fragment Phong lighting
-   vec4 ktex = texture(diffuse_tex, inData.tex_coord);
+   //vec4 ktex = texture(diffuse_tex, inData.tex_coord);
 	
-   vec4 ambient_term = ka*ktex*La;
+   vec4 ambient_term = ka*La;
 
    const float eps = 1e-8; //small value to avoid division by 0
    float d = distance(light_w.xyz, inData.pw.xyz);
@@ -46,7 +46,7 @@ void main(void)
 
    vec3 nw = normalize(inData.nw);			//world-space unit normal vector
    vec3 lw = normalize(light_w.xyz - inData.pw.xyz);	//world-space unit light vector
-   vec4 diffuse_term = atten*kd*ktex*Ld*max(0.0, dot(nw, lw));
+   vec4 diffuse_term = atten*kd*Ld*max(0.0, dot(nw, lw));
 
    vec3 vw = normalize(eye_w.xyz - inData.pw.xyz);	//world-space unit view vector
    vec3 rw = reflect(-lw, nw);	//world-space unit reflection vector

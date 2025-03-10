@@ -25,6 +25,10 @@ namespace Uniforms
    {
       int M = 0; //model matrix
       int time = 1;
+      int enableF = 2; //Fresnel
+      int enableD = 3; //Distribution
+      int enableG = 4; //GA
+      
    };
 
    void Init()

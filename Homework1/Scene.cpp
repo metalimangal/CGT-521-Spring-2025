@@ -34,8 +34,8 @@ static const std::string vertex_shader("template_vs.glsl");
 static const std::string fragment_shader("template_fs.glsl");
 GLuint shader_program = -1;
 
-static const std::string mesh_name = "Amago0.obj";
-static const std::string texture_name = "AmagoT.bmp";
+static const std::string mesh_name = "teapot.obj";
+//static const std::string texture_name = "AmagoT.bmp";
 
 GLuint texture_id = -1; //Texture map for mesh
 MeshData mesh_data;
@@ -76,7 +76,7 @@ void Scene::Display(GLFWwindow* window)
 
    glUseProgram(shader_program);
    //Note that we don't need to set the value of a uniform here. The value is set with the "binding" in the layout qualifier
-   glBindTextureUnit(0, texture_id);
+   //glBindTextureUnit(0, texture_id);
 
    //Set uniforms
    glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
@@ -231,7 +231,7 @@ void Scene::Init()
 
    ReloadShader();
    mesh_data = LoadMesh(mesh_name);
-   texture_id = LoadTexture(texture_name);
+   //texture_id = LoadTexture(texture_name);
 
    Camera::UpdateP();
    Uniforms::Init();
