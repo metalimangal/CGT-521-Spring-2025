@@ -48,6 +48,8 @@ float angle = 0.0f;
 float scale = 1.0f;
 glm::vec3 rotationEuler = glm::vec3(0.0f, 0.0f, 0.0f);
 bool recording = false;
+int lightingMode = 0; // 0: None, 1: Fresnel, 2: Distribution, 3: Geometry, 4: Full Lighting
+
 
 namespace Scene
 {
@@ -100,7 +102,7 @@ void Scene::Display(GLFWwindow* window)
    glBindBuffer(GL_UNIFORM_BUFFER, Uniforms::material_ubo);
    glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Uniforms::MaterialData), &Uniforms::MaterialData);
    glBindBuffer(GL_UNIFORM_BUFFER, 0);
-
+ 
    glBindVertexArray(mesh_data.mVao);
    //glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
    mesh_data.DrawMesh();
@@ -168,9 +170,19 @@ void Scene::DrawGui(GLFWwindow* window)
 
 
    ImGui::SliderFloat("Scale", &scale, -10.0f, +10.0f);
-   ImGui::Checkbox("Enable Fresnel (F)", &enableF);
-   ImGui::Checkbox("Enable Distribution (D)", &enableD);
-   ImGui::Checkbox("Enable Geometry (G)", &enableG);
+
+   ImGui::Text("Select Lighting Mode:");
+   if (ImGui::RadioButton("None", lightingMode == 0)) lightingMode = 0;
+   if (ImGui::RadioButton("Fresnel (F)", lightingMode == 1)) lightingMode = 1;
+   if (ImGui::RadioButton("Distribution (D)", lightingMode == 2)) lightingMode = 2;
+   if (ImGui::RadioButton("Geometry (G)", lightingMode == 3)) lightingMode = 3;
+   if (ImGui::RadioButton("Full Lighting", lightingMode == 4)) lightingMode = 4;
+
+   // Update boolean flags based on the selected mode
+   enableF = (lightingMode == 1 || lightingMode == 4);
+   enableD = (lightingMode == 2 || lightingMode == 4);
+   enableG = (lightingMode == 3 || lightingMode == 4);
+
 
    ImGui::Begin("Material Settings");
 
@@ -187,7 +199,7 @@ void Scene::DrawGui(GLFWwindow* window)
    ImGui::SliderFloat("Shininess", &Uniforms::MaterialData.shininess, 1.0f, 128.0f);
 
    // Eta (refractive index)
-   ImGui::SliderFloat("Eta (Refractive Index)", &Uniforms::MaterialData.eta, 1.0f, 20.0f);
+   ImGui::SliderFloat("Eta (Refractive Index)", &Uniforms::MaterialData.eta, 1.0f, 100.0f);
 
    // Roughness (m in Cook-Torrance)
    ImGui::SliderFloat("Roughness (m)", &Uniforms::MaterialData.roughness, 0.01f, 1.0f);

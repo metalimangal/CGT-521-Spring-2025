@@ -21,7 +21,7 @@
   <PropertyGroup Label="Globals">
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
-    <ProjectGuid>{634de7ac-9267-4c19-ac26-ea92529598a8}</ProjectGuid>
+    <ProjectGuid>{EEEEC8A5-C5A1-40E1-B0F5-11A123C33E71}</ProjectGuid>
     <RootNamespace>Template</RootNamespace>
     <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
     <ProjectName>CookTorrence</ProjectName>
