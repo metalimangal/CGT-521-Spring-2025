@@ -30,7 +30,7 @@ namespace Uniforms
       glm::vec4 ks = glm::vec4(1.0f);	//specular material color
       float shininess = 20.0f;         //specular exponent
       float eta = 10.0f;                // refractive index
-      float roughness = 10.0f; // surface roughness (m in Cook-Torrance)
+      float roughness = 1.0f; // surface roughness (m in Cook-Torrance)
    };
 
    extern SceneUniforms SceneData;

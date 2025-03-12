@@ -41,6 +41,7 @@ in VertexData
 out vec4 fragcolor; //the output color for this fragment    
 
 const float PI = 3.14159265359;
+const float eps = 1e-8; //small value to avoid division by 0
 
 // Schlick's approximation for Fresnel
 vec4 FresnelSchlick(float cosTheta, vec4 F0)
@@ -53,16 +54,16 @@ float DistributionBeckmann(float NdotH, float m)
 {
     float NdotH2 = NdotH * NdotH;
     float m2 = m * m;
-    float tan2Alpha = (1.0 - NdotH2) / max(NdotH2, 0.001);
+    float tan2Alpha = (1.0 - NdotH2) / max(NdotH2 + eps, 0.001);
     float exponent = exp(-tan2Alpha / m2);
-    return exponent / (4.0 * m2 * NdotH2 * NdotH2);
+    return exponent / (4.0 * m2 * NdotH2 * NdotH2 + eps);
 }
 
 // Cook-Torrance Geometry term
 float GeometryCookTorrance(float NdotV, float NdotL, float NdotH, float VdotH)
 {
-    float G1 = (2.0 * NdotH * NdotV) / VdotH;
-    float G2 = (2.0 * NdotH * NdotL) / VdotH;
+    float G1 = (2.0 * NdotH * NdotV) / VdotH + eps;
+    float G2 = (2.0 * NdotH * NdotL) / VdotH + eps;
     return min(1.0, min(G1, G2));
 }
 
@@ -73,7 +74,7 @@ void main(void)
 	
    vec4 ambient_term = ka*La;
 
-   const float eps = 1e-8; //small value to avoid division by 0
+
    float d = distance(light_w.xyz, inData.pw.xyz);
    //float atten = 1.0/(d*d+eps); //d-squared attenuation
 
@@ -98,7 +99,7 @@ void main(void)
    float D = enableD ? DistributionBeckmann(NdotH, roughness):1.0;
    float G = enableG ? GeometryCookTorrance(NdotV, NdotL, NdotH, VdotH) : 1.0;
 
-   vec4 specular_term = ks * Ls * (D * G * fresnel) / max(PI * NdotL * NdotV, 0.001);
+   vec4 specular_term = ks * Ls * (D * G * fresnel) / max(PI * NdotL * NdotV + eps, 0.001);
 
    fragcolor = ambient_term + diffuse_term + specular_term;
 }
