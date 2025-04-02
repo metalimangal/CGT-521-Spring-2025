@@ -21,6 +21,10 @@ Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "ConditionalRenderingDemo", 
 EndProject
 Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "CookTorrence", "Homework3\Homework3.vcxproj", "{EEEEC8A5-C5A1-40E1-B0F5-11A123C33E71}"
 EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TessellationQuad", "TessellationQuad\TessellationQuad.vcxproj", "{97454991-2484-432C-BBA8-781CDE7E6CA6}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "TessellationQuadGrid", "TessellationQuadGrid\TessellationQuadGrid.vcxproj", "{298C6A2D-B969-457E-A285-5232335CE855}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|x64 = Debug|x64
@@ -101,6 +105,22 @@ Global
 		{EEEEC8A5-C5A1-40E1-B0F5-11A123C33E71}.Release|x64.Build.0 = Release|x64
 		{EEEEC8A5-C5A1-40E1-B0F5-11A123C33E71}.Release|x86.ActiveCfg = Release|Win32
 		{EEEEC8A5-C5A1-40E1-B0F5-11A123C33E71}.Release|x86.Build.0 = Release|Win32
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Debug|x64.ActiveCfg = Debug|x64
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Debug|x64.Build.0 = Debug|x64
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Debug|x86.ActiveCfg = Debug|Win32
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Debug|x86.Build.0 = Debug|Win32
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Release|x64.ActiveCfg = Release|x64
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Release|x64.Build.0 = Release|x64
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Release|x86.ActiveCfg = Release|Win32
+		{97454991-2484-432C-BBA8-781CDE7E6CA6}.Release|x86.Build.0 = Release|Win32
+		{298C6A2D-B969-457E-A285-5232335CE855}.Debug|x64.ActiveCfg = Debug|x64
+		{298C6A2D-B969-457E-A285-5232335CE855}.Debug|x64.Build.0 = Debug|x64
+		{298C6A2D-B969-457E-A285-5232335CE855}.Debug|x86.ActiveCfg = Debug|Win32
+		{298C6A2D-B969-457E-A285-5232335CE855}.Debug|x86.Build.0 = Debug|Win32
+		{298C6A2D-B969-457E-A285-5232335CE855}.Release|x64.ActiveCfg = Release|x64
+		{298C6A2D-B969-457E-A285-5232335CE855}.Release|x64.Build.0 = Release|x64
+		{298C6A2D-B969-457E-A285-5232335CE855}.Release|x86.ActiveCfg = Release|Win32
+		{298C6A2D-B969-457E-A285-5232335CE855}.Release|x86.Build.0 = Release|Win32
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
