@@ -187,17 +187,29 @@ void Scene::Display(GLFWwindow* window)
    //Note that we don't need to set the value of a uniform here. The value is set with the "binding" in the layout qualifier
    glBindTextureUnit(0, texture_id);
 
-   //Set uniforms
-   glm::mat4 M = glm::rotate(angle, glm::vec3(0.0f, 1.0f, 0.0f)) * glm::scale(glm::vec3(scale * mesh_data.mScaleFactor));
-   glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(M));
+   glm::mat4 model = glm::mat4(1.0f);
 
+   model = glm::translate(model, glm::vec3(0.0, 7.0f, 0.0f));
+   model = glm::scale(model, glm::vec3(7.5f, 7.5f, 7.5f));
+   glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
 
    glUniform1i(glGetUniformLocation(shader_program, "invertedNormals"), 1);
    renderCube();
    glUniform1i(glGetUniformLocation(shader_program, "invertedNormals"), 0);
 
-   glBindVertexArray(mesh_data.mVao);
-   glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+
+   for (const auto& obj : sceneObjects)
+   {
+       glm::mat4 model = obj.getModelMatrix();
+       model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data.mScaleFactor));
+
+       glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+
+       // Bind the mesh VAO and draw it
+       glBindVertexArray(mesh_data.mVao);
+       glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+   }
+
    //For meshes with multiple submeshes use mesh_data.DrawMesh(); 
 
    DrawGui(window);
@@ -263,6 +275,38 @@ void Scene::DrawGui(GLFWwindow* window)
    {
       show_imgui_demo = true;
    }
+
+   ImGui::Separator();
+   ImGui::Text("Add New Object");
+   if (ImGui::Button("Add Object"))
+   {
+       sceneObjects.push_back(SceneObject());
+   }
+
+   // Display and edit existing object positions
+   ImGui::Separator();
+   ImGui::Text("Edit Object Transformations");
+
+   for (size_t i = 0; i < sceneObjects.size(); ++i)
+   {
+       ImGui::PushID(static_cast<int>(i)); // Ensure unique ID for each slider group
+       ImGui::SliderFloat3(("Position " + std::to_string(i)).c_str(), glm::value_ptr(sceneObjects[i].position), -10.0f, 10.0f);
+       ImGui::SliderFloat3(("Rotation " + std::to_string(i)).c_str(), glm::value_ptr(sceneObjects[i].rotation), -180.0f, 180.0f);
+       ImGui::SliderFloat3(("Scale " + std::to_string(i)).c_str(), glm::value_ptr(sceneObjects[i].scale), 0.1f, 10.0f);
+
+       if (ImGui::Button("Remove"))
+       {
+           sceneObjects.erase(sceneObjects.begin() + i);
+       }
+       ImGui::PopID();
+   }
+
+   ImGui::Separator();
+
+
+
+
+
    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
    ImGui::End();
@@ -349,4 +393,6 @@ void Scene::Init()
 
    Camera::UpdateP();
    Uniforms::Init();
+
+   sceneObjects.insert(sceneObjects.end(), initialObjects.begin(), initialObjects.end());
 }
