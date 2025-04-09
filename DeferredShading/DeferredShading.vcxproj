@@ -173,10 +173,8 @@
     <ClInclude Include="VideoRecorder.h" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="fw_fs.glsl" />
-    <None Include="fw_vs.glsl" />
-    <None Include="template_fs.glsl" />
-    <None Include="template_vs.glsl" />
+    <None Include="multi_fs.glsl" />
+    <None Include="multi_vs.glsl" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

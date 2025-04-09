@@ -7,6 +7,7 @@ namespace Uniforms
 {
    void Init();
    void BufferSceneData();
+   void BufferLightData();
 
    //This structure mirrors the uniform block declared in the shader
    struct SceneUniforms
@@ -15,13 +16,20 @@ namespace Uniforms
       glm::vec4 eye_w = glm::vec4(0.0f, 0.0f, 3.0f, 1.0f);	//world-space eye position
    };
 
+   const int MAX_LIGHTS = 1000;
+
    struct LightUniforms
    {
-      glm::vec4 La = glm::vec4(0.5f, 0.5f, 0.55f, 1.0f);	//ambient light color
-      glm::vec4 Ld = glm::vec4(0.5f, 0.5f, 0.25f, 1.0f);	//diffuse light color
-      glm::vec4 Ls = glm::vec4(0.3f);	//specular light color
-      glm::vec4 light_w = glm::vec4(0.0f, 1.2, 1.0f, 1.0f); //world-space light position
+
+       glm::vec4 ambientColor = glm::vec4(1.0f);
+       glm::vec4 diffuseColors[MAX_LIGHTS];
+       glm::vec4 positions[MAX_LIGHTS];
+       
+       glm::vec4 specularColors[MAX_LIGHTS];
+       float radii[MAX_LIGHTS];
+
    };
+
 
    struct MaterialUniforms
    {
@@ -53,5 +61,7 @@ namespace Uniforms
    {
       extern int M; //model matrix
       extern int time;
+      extern int invertedNormals;
+      extern int numLights;
    };
 };

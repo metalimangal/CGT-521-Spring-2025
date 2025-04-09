@@ -27,18 +27,32 @@
 #include "VideoRecorder.h"      //Functions for saving videos
 #include "DebugCallback.h"
 
+#include <deque>
+
+
 const int Scene::InitWindowWidth = 1024;
 const int Scene::InitWindowHeight = 1024;
 
-static const std::string vertex_shader("template_vs.glsl");
-static const std::string fragment_shader("template_fs.glsl");
+static const std::string vertex_shader("multi_vs.glsl");
+static const std::string fragment_shader("multi_fs.glsl");
+
+
+static const std::string vertex_shader_geometry("template_vs.glsl");
+static const std::string fragment_shader_geometry("template_fs.glsl");
+
+static const std::string vertex_shader_deferred("template_vs.glsl");
+static const std::string fragment_shader_deferred("template_fs.glsl");
+
 GLuint shader_program = -1;
 
 static const std::string mesh_name = "Amago0.obj";
+//static const std::string mesh_name = "cat.obj";
 static const std::string texture_name = "AmagoT.bmp";
+//static const std::string texture_name = "cat.jpg";
 
 GLuint texture_id = -1; //Texture map for mesh
 MeshData mesh_data;
+MeshData mesh_data2;
 
 float angle = 0.0f;
 float scale = 1.0f;
@@ -63,9 +77,17 @@ namespace Scene
    }
 }
 
+GLuint gpuTimerQuery = 0;
+bool timerInitialized = false;
+std::deque<float> frameTimes;
+const int maxFrameSamples = 100;
+
+
 
 unsigned int cubeVAO = 0;
 unsigned int cubeVBO = 0;
+
+int numLights = 100;
 
 
 class SceneObject {
@@ -179,13 +201,18 @@ void Scene::Display(GLFWwindow* window)
    //Clear the screen to the color previously specified in the glClearColor(...) call.
    glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
+   glBeginQuery(GL_TIME_ELAPSED, gpuTimerQuery);
+
    Camera::V = glm::lookAt(glm::vec3(Uniforms::SceneData.eye_w), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
    Uniforms::SceneData.PV = Camera::P * Camera::V;
    Uniforms::BufferSceneData();
 
    glUseProgram(shader_program);
+
+
    //Note that we don't need to set the value of a uniform here. The value is set with the "binding" in the layout qualifier
    glBindTextureUnit(0, texture_id);
+
 
    glm::mat4 model = glm::mat4(1.0f);
 
@@ -193,9 +220,10 @@ void Scene::Display(GLFWwindow* window)
    model = glm::scale(model, glm::vec3(7.5f, 7.5f, 7.5f));
    glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
 
-   glUniform1i(glGetUniformLocation(shader_program, "invertedNormals"), 1);
+   glUniform1i(Uniforms::UniformLocs::invertedNormals, 1);
    renderCube();
-   glUniform1i(glGetUniformLocation(shader_program, "invertedNormals"), 0);
+   glUniform1i(Uniforms::UniformLocs::invertedNormals, 0);
+
 
 
    for (const auto& obj : sceneObjects)
@@ -208,9 +236,39 @@ void Scene::Display(GLFWwindow* window)
        // Bind the mesh VAO and draw it
        glBindVertexArray(mesh_data.mVao);
        glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+
+       //mesh_data.DrawMesh();
    }
 
    //For meshes with multiple submeshes use mesh_data.DrawMesh(); 
+
+
+   // Populate 100 lights (example)
+
+   //for (int i = 0; i < Uniforms::LightData.numLights; ++i)
+   //{
+   //    float angle = 2.0f * glm::pi<float>() * (float)i / Uniforms::LightData.numLights;
+   //    float x = 3.0f * cos(angle);
+   //    float z = 3.0f * sin(angle);
+
+   //    Uniforms::LightData.positions[i] = glm::vec4(x, 2.0f, z, 1.0f);
+   //    Uniforms::LightData.diffuseColors[i] = glm::vec4(glm::vec3(0.5f + 0.5f * sin(i)), 1.0f);
+   //    Uniforms::LightData.specularColors[i] = glm::vec4(1.0f);
+   //    Uniforms::LightData.radii[i] = 5.0f;
+   //}
+
+   //Uniforms::BufferLightData();
+
+   glEndQuery(GL_TIME_ELAPSED);
+
+   GLuint64 elapsedTime = 0;
+   glGetQueryObjectui64v(gpuTimerQuery, GL_QUERY_RESULT, &elapsedTime);
+   float ms = static_cast<float>(elapsedTime) / 1e6f; // Convert to ms
+
+   frameTimes.push_back(ms);
+   if (frameTimes.size() > maxFrameSamples)
+       frameTimes.pop_front();
+
 
    DrawGui(window);
 
@@ -305,6 +363,175 @@ void Scene::DrawGui(GLFWwindow* window)
 
 
 
+   ImGui::Begin("Material Settings");
+
+   // Ambient color (ka)
+   ImGui::ColorEdit4("Ambient (ka)", glm::value_ptr(Uniforms::MaterialData.ka));
+
+   // Diffuse color (kd)
+   ImGui::ColorEdit4("Diffuse (kd)", glm::value_ptr(Uniforms::MaterialData.kd));
+
+   // Specular color (ks)
+   ImGui::ColorEdit4("Specular (ks)", glm::value_ptr(Uniforms::MaterialData.ks));
+
+   // Shininess slider
+   ImGui::SliderFloat("Shininess", &Uniforms::MaterialData.shininess, 1.0f, 128.0f);
+
+
+   ImGui::End();
+
+   ImGui::Begin("Lights");
+      ImGui::SliderInt("Num Lights", &numLights, 1, Uniforms::MAX_LIGHTS);
+       glUniform1i(Uniforms::UniformLocs::numLights, numLights);
+
+
+       ImGui::ColorEdit4("Ambient Light Color", glm::value_ptr(Uniforms::LightData.ambientColor));
+
+           static glm::vec3 basePosition = glm::vec3(0.0f, 2.0f, 0.0f);
+           static float spacing = 1.5f;
+           static float globalRadius = 5.0f;
+           static glm::vec4 globalDiffuse = glm::vec4(1.0f, 0.6f, 0.3f, 1.0f);
+           static glm::vec4 globalSpecular = glm::vec4(1.0f);
+           static glm::vec4 globalColor = glm::vec4(1.0f);
+
+
+
+
+           bool updateAll = false;
+
+           updateAll |= ImGui::DragFloat3("Base Position", &basePosition.x, 0.1f);
+           updateAll |= ImGui::DragFloat("Spacing", &spacing, 0.1f, 0.1f, 10.0f);
+           updateAll |= ImGui::DragFloat("Radius", &globalRadius, 0.1f, 0.1f, 100.0f);
+           updateAll |= ImGui::ColorEdit4("Diffuse Color", &globalDiffuse.x);
+           updateAll |= ImGui::ColorEdit4("Specular Color", &globalSpecular.x);
+
+           if (updateAll) {
+               for (int i = 0; i < numLights; ++i) {
+                   float angle = 2.0f * glm::pi<float>() * i / numLights;
+                   float x = basePosition.x + cos(angle) * spacing * i * 0.1f;
+                   float z = basePosition.z + sin(angle) * spacing * i * 0.1f;
+                   float y = basePosition.y;
+
+                   Uniforms::LightData.positions[i] = glm::vec4(x, y, z, 1.0f);
+                   Uniforms::LightData.radii[i] = globalRadius;
+                   Uniforms::LightData.diffuseColors[i] = globalDiffuse;
+                   Uniforms::LightData.specularColors[i] = globalSpecular;
+               }
+           }
+      
+
+       ImGui::End();
+
+
+
+       //ImGui::Begin("Lights");
+
+       //static int mode = 0; // 0: Circle, 1: Grid
+       //ImGui::RadioButton("Circle Mode", &mode, 0); ImGui::SameLine();
+       //ImGui::RadioButton("Grid Mode", &mode, 1);
+
+       //// Global UI
+       //ImGui::SliderInt("Num Lights", &numLights, 1, Uniforms::MAX_LIGHTS);
+       //glUniform1i(Uniforms::UniformLocs::numLights, numLights);
+       //ImGui::ColorEdit4("Ambient Light", glm::value_ptr(Uniforms::LightData.ambientColor));
+       //static float radius = 5.0f;
+       //ImGui::DragFloat("Radius", &radius, 0.1f, 0.1f, 100.0f);
+
+       //// Base Position and Spacing
+       //static glm::vec3 basePosition = glm::vec3(0.0f, 2.0f, 0.0f);
+       //static float spacing = 1.5f;
+       //ImGui::DragFloat3("Base Position", &basePosition.x, 0.1f);
+       //ImGui::DragFloat("Spacing", &spacing, 0.1f, 0.1f, 10.0f);
+
+       //// --- MODE 0: CIRCLE ---
+       //static glm::vec4 globalDiffuse = glm::vec4(1.0f, 0.6f, 0.3f, 1.0f);
+       //static glm::vec4 globalSpecular = glm::vec4(1.0f);
+
+       //// --- MODE 1: GRID ---
+       //const int colorSetCount = 3;
+       //const int lightsPerGroup = 10;
+
+       //static glm::vec4 groupDiffuseColors[colorSetCount] = {
+       //    glm::vec4(1.0f, 0.3f, 0.3f, 1.0f),
+       //    glm::vec4(0.3f, 1.0f, 0.3f, 1.0f),
+       //    glm::vec4(0.3f, 0.3f, 1.0f, 1.0f)
+       //};
+
+       //static glm::vec4 groupSpecularColors[colorSetCount] = {
+       //    glm::vec4(1.0f),
+       //    glm::vec4(0.8f, 0.8f, 0.2f, 1.0f),
+       //    glm::vec4(0.5f, 1.0f, 1.0f, 1.0f)
+       //};
+
+       //bool updateLights = false;
+
+       //if (mode == 0) {
+       //    ImGui::ColorEdit4("Global Diffuse", &globalDiffuse.x);
+       //    ImGui::ColorEdit4("Global Specular", &globalSpecular.x);
+       //}
+       //else {
+       //    for (int i = 0; i < colorSetCount; ++i) {
+       //        ImGui::ColorEdit4(("Diffuse Group " + std::to_string(i)).c_str(), &groupDiffuseColors[i].x);
+       //        ImGui::ColorEdit4(("Specular Group " + std::to_string(i)).c_str(), &groupSpecularColors[i].x);
+       //    }
+       //}
+
+       //updateLights = ImGui::Button("Update Lights");
+
+       //if (updateLights) {
+
+
+       //    for (int i = 0; i < numLights; ++i) {
+       //        float y = basePosition.y;
+       //        float x, z;
+
+       //        if (mode == 0) {
+       //            // Circle layout
+       //            float angle = 2.0f * glm::pi<float>() * i / numLights;
+       //            x = basePosition.x + cos(angle) * spacing * i * 0.1f;
+       //            z = basePosition.z + sin(angle) * spacing * i * 0.1f;
+
+       //            Uniforms::LightData.diffuseColors[i] = globalDiffuse;
+       //            Uniforms::LightData.specularColors[i] = globalSpecular;
+       //        }
+       //        else {
+       //            // Grid layout
+       //            int row = i / 10;
+       //            int col = i % 10;
+       //            x = basePosition.x + col * spacing;
+       //            z = basePosition.z + row * spacing;
+
+       //            int groupIndex = (i / lightsPerGroup) % colorSetCount;
+       //            Uniforms::LightData.diffuseColors[i] = groupDiffuseColors[groupIndex];
+       //            Uniforms::LightData.specularColors[i] = groupSpecularColors[groupIndex];
+       //        }
+
+       //        Uniforms::LightData.positions[i] = glm::vec4(x, y, z, 1.0f);
+       //        Uniforms::LightData.radii[i] = radius;
+       //    }
+
+       //}
+
+       //ImGui::End();
+
+   
+   Uniforms::BufferLightData();
+
+
+   glBindBuffer(GL_UNIFORM_BUFFER, Uniforms::material_ubo);
+   glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(Uniforms::MaterialData), &Uniforms::MaterialData);
+   glBindBuffer(GL_UNIFORM_BUFFER, 0);
+
+   ImGui::Separator();
+   ImGui::Text("GPU Frame Time (ms)");
+
+   static float frameTimeBuffer[100];
+   std::copy(frameTimes.begin(), frameTimes.end(), frameTimeBuffer);
+   int sampleCount = static_cast<int>(frameTimes.size());
+
+   ImGui::PlotLines("GPU Time", frameTimeBuffer, sampleCount, 0, nullptr, 0.0f, 50.0f, ImVec2(0, 150));
+
+
 
 
    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -389,10 +616,18 @@ void Scene::Init()
 
    ReloadShader();
    mesh_data = LoadMesh(mesh_name);
+
+   //mesh_data2 = LoadMesh(mesh_name2);
    texture_id = LoadTexture(texture_name);
 
    Camera::UpdateP();
    Uniforms::Init();
+
+   if (!timerInitialized) {
+       glGenQueries(1, &gpuTimerQuery);
+       timerInitialized = true;
+   }
+
 
    sceneObjects.insert(sceneObjects.end(), initialObjects.begin(), initialObjects.end());
 }

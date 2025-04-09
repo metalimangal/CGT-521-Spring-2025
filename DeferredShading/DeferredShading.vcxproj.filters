@@ -121,16 +121,10 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="template_fs.glsl">
+    <None Include="multi_fs.glsl">
       <Filter>Shaders</Filter>
     </None>
-    <None Include="template_vs.glsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="fw_fs.glsl">
-      <Filter>Shaders</Filter>
-    </None>
-    <None Include="fw_vs.glsl">
+    <None Include="multi_vs.glsl">
       <Filter>Shaders</Filter>
     </None>
   </ItemGroup>

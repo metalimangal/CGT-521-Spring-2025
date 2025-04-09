@@ -1,6 +1,7 @@
 #version 430
 layout(location = 0) uniform mat4 M;
 layout(location = 1) uniform float time;
+layout(location = 2) uniform bool invertedNormals;
 
 layout(std140, binding = 0) uniform SceneUniforms
 {
@@ -11,6 +12,9 @@ layout(std140, binding = 0) uniform SceneUniforms
 layout(location = 0) in vec3 pos_attrib; //this variable holds the position of mesh vertices
 layout(location = 1) in vec2 tex_coord_attrib;
 layout(location = 2) in vec3 normal_attrib;
+
+
+
 
 out VertexData
 {
@@ -26,5 +30,5 @@ void main(void)
 	//Use dot notation to access members of the interface block
 	outData.tex_coord = tex_coord_attrib;           //send tex_coord to fragment shader
 	outData.pw = vec3(M * vec4(pos_attrib, 1.0));		//world-space vertex position
-	outData.nw = vec3(M * vec4(normal_attrib, 0.0));	//world-space normal vector
+	outData.nw = vec3(M * vec4(normal_attrib, 0.0)) * (invertedNormals ? -1 : 1);	//world-space normal vector
 }

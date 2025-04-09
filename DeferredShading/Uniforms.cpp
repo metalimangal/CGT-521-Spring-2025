@@ -25,6 +25,8 @@ namespace Uniforms
    {
       int M = 0; //model matrix
       int time = 1;
+      int invertedNormals = 2;
+      int numLights = 3;
    };
 
    void Init()
@@ -37,7 +39,7 @@ namespace Uniforms
 
       glGenBuffers(1, &light_ubo);
       glBindBuffer(GL_UNIFORM_BUFFER, light_ubo);
-      glBufferData(GL_UNIFORM_BUFFER, sizeof(LightUniforms), &LightData, GL_STREAM_DRAW); //Allocate memory for the buffer, but don't copy (since pointer is null).
+      glBufferData(GL_UNIFORM_BUFFER, sizeof(LightUniforms), &LightData, GL_DYNAMIC_DRAW); //Allocate memory for the buffer, but don't copy (since pointer is null).
       glBindBufferBase(GL_UNIFORM_BUFFER, UboBinding::light, light_ubo); //Associate this uniform buffer with the uniform block in the shader that has the same binding.
 
       glGenBuffers(1, &material_ubo);
@@ -53,5 +55,12 @@ namespace Uniforms
       glBindBuffer(GL_UNIFORM_BUFFER, scene_ubo); //Bind the OpenGL UBO before we update the data.
       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(SceneData), &SceneData); //Upload the new uniform values.
       glBindBuffer(GL_UNIFORM_BUFFER, 0); //unbind the ubo
+   }
+
+   void BufferLightData()
+   {
+       glBindBuffer(GL_UNIFORM_BUFFER, light_ubo);
+       glBufferSubData(GL_UNIFORM_BUFFER, 0, sizeof(LightUniforms), &LightData);
+       glBindBuffer(GL_UNIFORM_BUFFER, 0);
    }
 };
