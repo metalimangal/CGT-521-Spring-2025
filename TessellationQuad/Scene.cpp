@@ -76,12 +76,12 @@ void Scene::Display(GLFWwindow* window)
    glUseProgram(shader_program);
 
    glBindVertexArray(patch_vao);
-   glPatchParameteri(GL_PATCH_VERTICES, 4); //number of input verts to the tess. control shader per patch.
+   glPatchParameteri(GL_PATCH_VERTICES, 3); //number of input verts to the tess. control shader per patch.
 
    glBeginQuery(GL_PRIMITIVES_GENERATED, prim_query);
 
       glPolygonMode(GL_FRONT_AND_BACK, GL_LINE); //Draw wireframe so we can see the edges of generated triangles
-	   glDrawArrays(GL_PATCHES, 0, 4); //Draw patches since we are using a tessellation shader.
+	   glDrawArrays(GL_PATCHES, 0, 3); //Draw patches since we are using a tessellation shader.
       glPolygonMode(GL_FRONT_AND_BACK, GL_FILL);
 
    glEndQuery(GL_PRIMITIVES_GENERATED);
@@ -187,13 +187,20 @@ void Scene::DrawGui(GLFWwindow* window)
    int max_tess_level=-1;
    glGetIntegerv(GL_MAX_TESS_GEN_LEVEL, &max_tess_level);
 
-   const int n_sliders = 6;
-   static float slider[n_sliders] = { 1.0f,1.0f,1.0f,1.0f };
-   const std::string labels[n_sliders] = {"gl_TessLevelOuter[0]","gl_TessLevelOuter[1]","gl_TessLevelOuter[2]","gl_TessLevelOuter[3]", "gl_TessLevelInner[0]", "gl_TessLevelInner[1]"};
-   for (int i = 0; i<n_sliders; i++)
+   const int n_sliders = 4; // We will only use 4 sliders
+   static float slider[n_sliders] = { 1.0f, 1.0f, 1.0f, 1.0f };  // Default values for outer and inner tessellation levels
+   const std::string labels[n_sliders] = {
+       "gl_TessLevelOuter[0]", "gl_TessLevelOuter[1]",
+       "gl_TessLevelOuter[2]", "gl_TessLevelInner[0]"
+   };
+
+   // Loop through sliders and create them in the UI
+   for (int i = 0; i < n_sliders; i++)
    {
-      ImGui::SliderFloat(labels[i].c_str(), &slider[i], 1, max_tess_level);
+       ImGui::SliderFloat(labels[i].c_str(), &slider[i], 1.0f, max_tess_level);  // Range: 1.0f to max_tess_level
    }
+
+   // Pass the updated slider values to the shader
    glUniform1fv(Uniforms::UniformLocs::slider, n_sliders, slider);
 
    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
@@ -287,10 +294,11 @@ void Scene::Init()
    glGenVertexArrays(1, &patch_vao);
    glBindVertexArray(patch_vao);
 
-   float vertices[] = {-1.0f, -1.0f, 0.0f, 
-                        1.0f, -1.0f, 0.0f, 
-                        1.0f, +1.0f, 0.0f,
-                       -1.0f, +1.0f, 0.0f};
+   float vertices[] = {
+     0.0f,  1.0f, 0.0f,  // top vertex
+    -1.0f, -1.0f, 0.0f,  // bottom left vertex
+     1.0f, -1.0f, 0.0f   // bottom right vertex
+   };
    
    //create vertex buffer for vertex coords
    GLuint patch_vbo = -1;
