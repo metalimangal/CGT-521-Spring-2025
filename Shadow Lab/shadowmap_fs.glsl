@@ -1,7 +1,10 @@
 #version 430
-layout(binding = 0) uniform sampler2D shadow_map; 
+layout(binding = 0) uniform sampler2DShadow shadow_map;
 layout(location = 1) uniform float time;
 layout(location = 2) uniform int pass;
+layout(location = 3) uniform int u_pcf_mode; // 0 for 2x2, 1 for 4x4
+layout(location = 4) uniform float u_w_numerator;
+layout(location = 5) uniform int u_debug_lit4;
 
 layout(std140, binding = 0) uniform SceneUniforms
 {
@@ -37,13 +40,32 @@ in VertexData
 
 out vec4 fragcolor; //the output color for this fragment    
 
+vec4 lit4;
+
 void main(void)
 {   
    //Compute per-fragment Phong lighting
 
-   float z = texture(shadow_map, inData.shadow_coord.xy/inData.shadow_coord.w).r; // light-space depth in the shadowmap
-	float r = inData.shadow_coord.z / inData.shadow_coord.w; // light-space depth of this fragment
-	float lit = float(r <= z); // if ref is closer than z then the fragment is lit
+   //float z = texture(shadow_map, inData.shadow_coord.xy/inData.shadow_coord.w).r; // light-space depth in the shadowmap
+	//float r = inData.shadow_coord.z / inData.shadow_coord.w; // light-space depth of this fragment
+	//float lit = float(r <= z); // if ref is closer than z then the fragment is lit
+	float lit = textureProj(shadow_map, inData.shadow_coord);
+	float w = u_w_numerator / textureSize(shadow_map, 0).x;
+
+	if (u_pcf_mode == 0) {
+		float lit = textureProj(shadow_map, inData.shadow_coord);
+	}
+	else {
+
+		lit4[0] = textureProj(shadow_map, inData.shadow_coord + vec4(-w, -w, 0.0, 0.0));
+		lit4[1] = textureProj(shadow_map, inData.shadow_coord + vec4(+w, -w, 0.0, 0.0));
+		lit4[2] = textureProj(shadow_map, inData.shadow_coord + vec4(-w, +w, 0.0, 0.0));
+		lit4[3] = textureProj(shadow_map, inData.shadow_coord + vec4(+w, +w, 0.0, 0.0));
+		/*vec3 coord = inData.shadow_coord.xyz / inData.shadow_coord.w;
+		vec4 lit4 = textureGather(shadow_map, coord.xy, coord.z);*/
+
+		lit = dot(lit4, vec4(0.25));
+	}
 
    vec4 ambient_term = ka*La;
 
@@ -63,5 +85,10 @@ void main(void)
    fragcolor = ambient_term + (lit+0.05)*(diffuse_term + specular_term);
    //fragcolor = lit4;
    fragcolor = pow(fragcolor, vec4(1.0/2.2));
+
+   if (u_debug_lit4 == 1) {
+	   fragcolor = lit4;
+   }
+
 }
 
