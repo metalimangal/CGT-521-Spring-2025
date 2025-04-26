@@ -45,12 +45,13 @@ static const std::string fragment_shader_deferred("template_fs.glsl");
 
 GLuint shader_program = -1;
 
-static const std::string mesh_name = "Amago0.obj";
-//static const std::string mesh_name = "cat.obj";
-static const std::string texture_name = "AmagoT.bmp";
-//static const std::string texture_name = "cat.jpg";
+static const std::string mesh_name = "models/Amago0.obj";
+static const std::string mesh_name2 = "models/cat.obj";
+static const std::string texture_name = "textures/AmagoT.bmp";
+static const std::string texture_name2 = "textures/cat.jpeg";
 
 GLuint texture_id = -1; //Texture map for mesh
+GLuint texture_id2 = -1; //Texture map for mesh
 MeshData mesh_data;
 MeshData mesh_data2;
 
@@ -211,7 +212,7 @@ void Scene::Display(GLFWwindow* window)
 
 
    //Note that we don't need to set the value of a uniform here. The value is set with the "binding" in the layout qualifier
-   glBindTextureUnit(0, texture_id);
+
 
 
    glm::mat4 model = glm::mat4(1.0f);
@@ -226,6 +227,9 @@ void Scene::Display(GLFWwindow* window)
 
 
 
+
+   glBindTextureUnit(0, texture_id);
+
    for (const auto& obj : sceneObjects)
    {
        glm::mat4 model = obj.getModelMatrix();
@@ -235,9 +239,25 @@ void Scene::Display(GLFWwindow* window)
 
        // Bind the mesh VAO and draw it
        glBindVertexArray(mesh_data.mVao);
-       glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+       //glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
 
-       //mesh_data.DrawMesh();
+       mesh_data.DrawMesh();
+   }
+
+   glBindTextureUnit(0, texture_id2);
+
+   for (const auto& obj : sceneObjects)
+   {
+       glm::mat4 model = obj.getModelMatrix();
+       model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data2.mScaleFactor));
+
+       glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+
+       // Bind the mesh VAO and draw it
+       glBindVertexArray(mesh_data2.mVao);
+       //glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+
+       mesh_data2.DrawMesh();
    }
 
    //For meshes with multiple submeshes use mesh_data.DrawMesh(); 
@@ -617,8 +637,9 @@ void Scene::Init()
    ReloadShader();
    mesh_data = LoadMesh(mesh_name);
 
-   //mesh_data2 = LoadMesh(mesh_name2);
+   mesh_data2 = LoadMesh(mesh_name2);
    texture_id = LoadTexture(texture_name);
+   texture_id2 = LoadTexture(texture_name2); 
 
    Camera::UpdateP();
    Uniforms::Init();

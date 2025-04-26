@@ -151,6 +151,7 @@
     <ClCompile Include="LoadTexture.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="Source.cpp" />
     <ClCompile Include="Uniforms.cpp" />
     <ClCompile Include="VideoRecorder.cpp" />
   </ItemGroup>
