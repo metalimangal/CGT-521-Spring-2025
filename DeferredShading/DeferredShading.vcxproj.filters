@@ -130,5 +130,17 @@
     <None Include="multi_vs.glsl">
       <Filter>Shaders</Filter>
     </None>
+    <None Include="geometry_vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="geometry_fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="deferred_vs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
+    <None Include="deferred_fs.glsl">
+      <Filter>Shaders</Filter>
+    </None>
   </ItemGroup>
 </Project>

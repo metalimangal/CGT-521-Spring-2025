@@ -37,11 +37,11 @@ static const std::string vertex_shader("multi_vs.glsl");
 static const std::string fragment_shader("multi_fs.glsl");
 
 
-static const std::string vertex_shader_geometry("template_vs.glsl");
-static const std::string fragment_shader_geometry("template_fs.glsl");
+static const std::string vertex_shader_geometry("geometry_vs.glsl");
+static const std::string fragment_shader_geometry("geometry_fs.glsl");
 
-static const std::string vertex_shader_deferred("template_vs.glsl");
-static const std::string fragment_shader_deferred("template_fs.glsl");
+static const std::string vertex_shader_deferred("deferred_vs.glsl");
+static const std::string fragment_shader_deferred("deferred_fs.glsl");
 
 GLuint shader_program = -1;
 
@@ -54,6 +54,12 @@ GLuint texture_id = -1; //Texture map for mesh
 GLuint texture_id2 = -1; //Texture map for mesh
 MeshData mesh_data;
 MeshData mesh_data2;
+
+GLuint cubeTextureID = -1;
+glm::vec3 cubeColor = glm::vec3(0.3f, 0.7f, 1.0f); // <-- whatever color you want, e.g., light blue
+glm::vec3 cubePosition = glm::vec3(0.936f, 5.596f, 1.512f);
+glm::vec3 cubeScale = glm::vec3(7.5f);
+
 
 float angle = 0.0f;
 float scale = 1.0f;
@@ -96,11 +102,12 @@ public:
     glm::vec3 position;
     glm::vec3 rotation; // Rotation in degrees for x, y, z axes
     glm::vec3 scale;
+    int meshIndex;
 
     SceneObject(const glm::vec3& pos = glm::vec3(0.0f),
         const glm::vec3& rot = glm::vec3(0.0f),
-        const glm::vec3& scl = glm::vec3(1.0f))
-        : position(pos), rotation(rot), scale(scl) {}
+        const glm::vec3& scl = glm::vec3(1.0f), const int index = 0)
+        : position(pos), rotation(rot), scale(scl), meshIndex(index){}
 
     glm::mat4 getModelMatrix() const {
         glm::mat4 model = glm::mat4(1.0f);
@@ -116,9 +123,9 @@ public:
 std::vector<SceneObject> sceneObjects;
 
 std::vector<SceneObject> initialObjects = {
-    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f)),
-    SceneObject(glm::vec3(1.5f, 0.0f, -2.0f), glm::vec3(0.0f, 45.0f, 0.0f), glm::vec3(0.5f)),
-    SceneObject(glm::vec3(-0.5f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f))
+    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 1),
+    SceneObject(glm::vec3(1.5f, 0.0f, -2.0f), glm::vec3(0.0f, 45.0f, 0.0f), glm::vec3(0.5f), 1),
+    SceneObject(glm::vec3(-0.5f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f), 0)
 };
 
 glm::vec3 newObjectPosition = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -129,49 +136,62 @@ void renderCube()
     if (cubeVAO == 0)
     {
         float vertices[] = {
-            // back face
-            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
-             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 0.0f, // bottom-right         
-             1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 1.0f, 1.0f, // top-right
-            -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 0.0f, // bottom-left
-            -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, -1.0f, 0.0f, 1.0f, // top-left
-            // front face
-            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-             1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-             1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 1.0f, 1.0f, // top-right
-            -1.0f,  1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 1.0f, // top-left
-            -1.0f, -1.0f,  1.0f,  0.0f,  0.0f,  1.0f, 0.0f, 0.0f, // bottom-left
-            // left face
-            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-            -1.0f,  1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-left
-            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-            -1.0f, -1.0f, -1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-left
-            -1.0f, -1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-            -1.0f,  1.0f,  1.0f, -1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-right
-            // right face
-             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 1.0f, // top-right         
-             1.0f, -1.0f, -1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 1.0f, // bottom-right
-             1.0f,  1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 1.0f, 0.0f, // top-left
-             1.0f, -1.0f,  1.0f,  1.0f,  0.0f,  0.0f, 0.0f, 0.0f, // bottom-left     
-            // bottom face
-            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-             1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 1.0f, // top-left
-             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-             1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 1.0f, 0.0f, // bottom-left
-            -1.0f, -1.0f,  1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 0.0f, // bottom-right
-            -1.0f, -1.0f, -1.0f,  0.0f, -1.0f,  0.0f, 0.0f, 1.0f, // top-right
-            // top face
-            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-             1.0f,  1.0f , 1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-             1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 1.0f, // top-right     
-             1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 1.0f, 0.0f, // bottom-right
-            -1.0f,  1.0f, -1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 1.0f, // top-left
-            -1.0f,  1.0f,  1.0f,  0.0f,  1.0f,  0.0f, 0.0f, 0.0f  // bottom-left        
+            // positions          // normals           // texcoords
+            // Back face
+            -1.0f, -1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
+             1.0f,  1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
+             1.0f, -1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   1.0f, 0.0f,
+
+             1.0f,  1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
+            -1.0f,  1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   0.0f, 1.0f,
+
+            // Front face
+            -1.0f, -1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    0.0f, 0.0f,
+             1.0f, -1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    1.0f, 0.0f,
+             1.0f,  1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    1.0f, 1.0f,
+
+             1.0f,  1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    1.0f, 1.0f,
+            -1.0f,  1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    0.0f, 1.0f,
+            -1.0f, -1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    0.0f, 0.0f,
+
+            // Left face
+            -1.0f,  1.0f,  1.0f,  -1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
+            -1.0f,  1.0f, -1.0f,  -1.0f, 0.0f, 0.0f,     1.0f, 1.0f,
+            -1.0f, -1.0f, -1.0f,  -1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
+
+            -1.0f, -1.0f, -1.0f,  -1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
+            -1.0f, -1.0f,  1.0f,  -1.0f, 0.0f, 0.0f,     0.0f, 0.0f,
+            -1.0f,  1.0f,  1.0f,  -1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
+
+            // Right face
+             1.0f,  1.0f,  1.0f,   1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
+             1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
+             1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.0f,     1.0f, 1.0f,
+
+             1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
+             1.0f,  1.0f,  1.0f,   1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
+             1.0f, -1.0f,  1.0f,   1.0f, 0.0f, 0.0f,     0.0f, 0.0f,
+
+             // Bottom face
+             -1.0f, -1.0f, -1.0f,   0.0f, -1.0f, 0.0f,    0.0f, 1.0f,
+              1.0f, -1.0f, -1.0f,   0.0f, -1.0f, 0.0f,    1.0f, 1.0f,
+              1.0f, -1.0f,  1.0f,   0.0f, -1.0f, 0.0f,    1.0f, 0.0f,
+
+              1.0f, -1.0f,  1.0f,   0.0f, -1.0f, 0.0f,    1.0f, 0.0f,
+             -1.0f, -1.0f,  1.0f,   0.0f, -1.0f, 0.0f,    0.0f, 0.0f,
+             -1.0f, -1.0f, -1.0f,   0.0f, -1.0f, 0.0f,    0.0f, 1.0f,
+
+             // Top face
+             -1.0f,  1.0f, -1.0f,   0.0f, 1.0f, 0.0f,     0.0f, 1.0f,
+              1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f,     1.0f, 0.0f,
+              1.0f,  1.0f, -1.0f,   0.0f, 1.0f, 0.0f,     1.0f, 1.0f,
+
+              1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f,     1.0f, 0.0f,
+             -1.0f,  1.0f, -1.0f,   0.0f, 1.0f, 0.0f,     0.0f, 1.0f,
+             -1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f,     0.0f, 0.0f
         };
+
         glGenVertexArrays(1, &cubeVAO);
         glGenBuffers(1, &cubeVBO);
         // fill buffer
@@ -217,48 +237,43 @@ void Scene::Display(GLFWwindow* window)
 
    glm::mat4 model = glm::mat4(1.0f);
 
-   model = glm::translate(model, glm::vec3(0.0, 7.0f, 0.0f));
-   model = glm::scale(model, glm::vec3(7.5f, 7.5f, 7.5f));
+   model = glm::translate(model, cubePosition);
+   model = glm::scale(model, cubeScale);
    glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
 
    glUniform1i(Uniforms::UniformLocs::invertedNormals, 1);
+   glBindTextureUnit(0, cubeTextureID);
    renderCube();
    glUniform1i(Uniforms::UniformLocs::invertedNormals, 0);
 
 
 
 
-   glBindTextureUnit(0, texture_id);
-
    for (const auto& obj : sceneObjects)
    {
        glm::mat4 model = obj.getModelMatrix();
-       model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data.mScaleFactor));
 
-       glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+       if (obj.meshIndex == 0)
+       {
+           glBindTextureUnit(0, texture_id);
+           model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data.mScaleFactor));
 
-       // Bind the mesh VAO and draw it
-       glBindVertexArray(mesh_data.mVao);
-       //glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
+           glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+           glBindVertexArray(mesh_data.mVao);
+           mesh_data.DrawMesh();
+       }
+       else if (obj.meshIndex == 1)
+       {
+           glBindTextureUnit(0, texture_id2);
+           model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data2.mScaleFactor));
 
-       mesh_data.DrawMesh();
+           glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+           glBindVertexArray(mesh_data2.mVao);
+           mesh_data2.DrawMesh();
+       }
    }
 
-   glBindTextureUnit(0, texture_id2);
 
-   for (const auto& obj : sceneObjects)
-   {
-       glm::mat4 model = obj.getModelMatrix();
-       model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data2.mScaleFactor));
-
-       glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
-
-       // Bind the mesh VAO and draw it
-       glBindVertexArray(mesh_data2.mVao);
-       //glDrawElements(GL_TRIANGLES, mesh_data.mSubmesh[0].mNumIndices, GL_UNSIGNED_INT, 0);
-
-       mesh_data2.DrawMesh();
-   }
 
    //For meshes with multiple submeshes use mesh_data.DrawMesh(); 
 
@@ -355,11 +370,23 @@ void Scene::DrawGui(GLFWwindow* window)
    }
 
    ImGui::Separator();
+   ImGui::Text("Change Render Cube Properties");
+
+   ImGui::SliderFloat3("Cube Position", glm::value_ptr(cubePosition), -10.0, 10.0);
+   ImGui::SliderFloat3("Cube Scale", glm::value_ptr(cubeScale), -10.0, 10.0);
+
+   ImGui::Separator();
+
+   ImGui::Separator();
    ImGui::Text("Add New Object");
+   static int selectedMeshIndex = 0; // 0: mesh_data, 1: mesh_data2
+   ImGui::Combo("Mesh", &selectedMeshIndex, "Mesh 0\0Mesh 1\0");
+
    if (ImGui::Button("Add Object"))
    {
-       sceneObjects.push_back(SceneObject());
+       sceneObjects.push_back(SceneObject(glm::vec3(0.0f), glm::vec3(0.0f), glm::vec3(1.0f), selectedMeshIndex));
    }
+
 
    // Display and edit existing object positions
    ImGui::Separator();
@@ -579,6 +606,8 @@ void Scene::Idle()
 void Scene::ReloadShader()
 {
    GLuint new_shader = InitShader(vertex_shader.c_str(), fragment_shader.c_str());
+   GLuint new_geometry_shader = InitShader(vertex_shader_geometry.c_str(), fragment_shader_geometry.c_str());
+
 
    if (new_shader == -1) // loading failed
    {
@@ -595,6 +624,27 @@ void Scene::ReloadShader()
       }
       shader_program = new_shader;
    }
+}
+
+void createCubeTexture() {
+    // Create a simple 1x1 texture for cube
+    glGenTextures(1, &cubeTextureID);
+    glBindTexture(GL_TEXTURE_2D, cubeTextureID);
+
+    // Create a single pixel color (e.g., blue)
+    unsigned char pixelColor[3] = { 76, 179, 255 }; // RGB (0.3, 0.7, 1.0) scaled to 0-255
+
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, pixelColor);
+
+    // Set texture parameters
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+
+
 }
 
 //Initialize OpenGL state. This function only gets called once.
@@ -640,6 +690,10 @@ void Scene::Init()
    mesh_data2 = LoadMesh(mesh_name2);
    texture_id = LoadTexture(texture_name);
    texture_id2 = LoadTexture(texture_name2); 
+
+
+   createCubeTexture();
+
 
    Camera::UpdateP();
    Uniforms::Init();
