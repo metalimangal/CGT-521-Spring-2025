@@ -50,8 +50,8 @@ GLuint shader_program = -1;
 GLuint shader_program_geometry = -1;
 GLuint shader_program_deferred = -1;
 
-static const std::string mesh_names[] = { "models/Amago0.obj", "models/cat.obj", "models/sm_gamecontroller.fbx", "models/sm_gamecontroller.fbx" };
-static const std::string texture_names[] = { "textures/AmagoT.bmp", "textures/cat.jpeg", "textures/T_GameController_Black_BaseColor.png", "textures/T_GameController_Gold_BaseColor.png"};
+static const std::string mesh_names[] = { "models/Amago0.obj", "models/cat.obj", "models/sm_gamecontroller.fbx", "models/sm_gamecontroller.fbx", "models/Wooden_Table_uc1kebzfa_High.fbx"};
+static const std::string texture_names[] = { "textures/AmagoT.bmp", "textures/cat.jpeg", "textures/T_GameController_Black_BaseColor.png", "textures/T_GameController_Gold_BaseColor.png", "textures/Wooden_Table_uc1kebzfa_High_4K_BaseColor.jpg"};
 
 
 GLuint texture_ids[std::size(texture_names)] = {-1}; // Initialize with default GLuint values (0)
@@ -62,7 +62,7 @@ GLuint gPosition, gNormal, gAlbedoSpec;
 GLuint rboDepth;
 
 
-static const std::string cubeTextureName = "textures/"; //I'll try adding the cube texture here for the rendering cube
+static const std::string cubeTextureName = "textures/Marble_AquaBlue_Albedo4K.png"; //I'll try adding the cube texture here for the rendering cube
 
 GLuint cubeTextureID = -1;
 glm::vec3 cubeColor = glm::vec3(0.3f, 0.7f, 1.0f); // To change the render cube color
@@ -142,9 +142,10 @@ public:
 std::vector<SceneObject> sceneObjects;
 
 std::vector<SceneObject> initialObjects = {
-    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 2),
-    SceneObject(glm::vec3(1.5f, 0.0f, -2.0f), glm::vec3(0.0f, 45.0f, 0.0f), glm::vec3(0.5f), 1),
-    SceneObject(glm::vec3(-0.5f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f), 0)
+    SceneObject(glm::vec3(0.071f, -0.496f, 0.0f), glm::vec3(-1.277f, 0.0f, 0.0f), glm::vec3(0.1f), 2),
+    SceneObject(glm::vec3(-0.062f, -0.496f, 0.0f), glm::vec3(-1.277f, 0.0f, 0.0f), glm::vec3(0.1f), 3),
+    SceneObject(glm::vec3(-1.56f, -1.915f, -2.0f), glm::vec3(4.5f, 0.0f, 1.0f), glm::vec3(1.0f), 1),
+    SceneObject(glm::vec3(0.0f, -1.206f, -0.709f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 4)
 };
 
 glm::vec3 newObjectPosition = glm::vec3(0.0f, 0.0f, 0.0f);
@@ -155,78 +156,85 @@ void renderCube()
     if (cubeVAO == 0)
     {
         float vertices[] = {
-            // positions          // normals           // texcoords
+            // positions          // texcoords        // normals
             // Back face
-            -1.0f, -1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
-             1.0f,  1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
-             1.0f, -1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   1.0f, 0.0f,
+            -1.0f, -1.0f, -1.0f,   0.0f, 0.0f,         0.0f,  0.0f, -1.0f,
+             1.0f,  1.0f, -1.0f,   1.0f, 1.0f,         0.0f,  0.0f, -1.0f,
+             1.0f, -1.0f, -1.0f,   1.0f, 0.0f,         0.0f,  0.0f, -1.0f,
 
-             1.0f,  1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   1.0f, 1.0f,
-            -1.0f, -1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   0.0f, 0.0f,
-            -1.0f,  1.0f, -1.0f,   0.0f,  0.0f, -1.0f,   0.0f, 1.0f,
+             1.0f,  1.0f, -1.0f,   1.0f, 1.0f,         0.0f,  0.0f, -1.0f,
+            -1.0f, -1.0f, -1.0f,   0.0f, 0.0f,         0.0f,  0.0f, -1.0f,
+            -1.0f,  1.0f, -1.0f,   0.0f, 1.0f,         0.0f,  0.0f, -1.0f,
 
             // Front face
-            -1.0f, -1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    0.0f, 0.0f,
-             1.0f, -1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    1.0f, 0.0f,
-             1.0f,  1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    1.0f, 1.0f,
+            -1.0f, -1.0f,  1.0f,   0.0f, 0.0f,         0.0f,  0.0f, 1.0f,
+             1.0f, -1.0f,  1.0f,   1.0f, 0.0f,         0.0f,  0.0f, 1.0f,
+             1.0f,  1.0f,  1.0f,   1.0f, 1.0f,         0.0f,  0.0f, 1.0f,
 
-             1.0f,  1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    1.0f, 1.0f,
-            -1.0f,  1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    0.0f, 1.0f,
-            -1.0f, -1.0f,  1.0f,   0.0f,  0.0f, 1.0f,    0.0f, 0.0f,
+             1.0f,  1.0f,  1.0f,   1.0f, 1.0f,         0.0f,  0.0f, 1.0f,
+            -1.0f,  1.0f,  1.0f,   0.0f, 1.0f,         0.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  1.0f,   0.0f, 0.0f,         0.0f,  0.0f, 1.0f,
 
             // Left face
-            -1.0f,  1.0f,  1.0f,  -1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
-            -1.0f,  1.0f, -1.0f,  -1.0f, 0.0f, 0.0f,     1.0f, 1.0f,
-            -1.0f, -1.0f, -1.0f,  -1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
+            -1.0f,  1.0f,  1.0f,   1.0f, 0.0f,        -1.0f,  0.0f, 0.0f,
+            -1.0f,  1.0f, -1.0f,   1.0f, 1.0f,        -1.0f,  0.0f, 0.0f,
+            -1.0f, -1.0f, -1.0f,   0.0f, 1.0f,        -1.0f,  0.0f, 0.0f,
 
-            -1.0f, -1.0f, -1.0f,  -1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
-            -1.0f, -1.0f,  1.0f,  -1.0f, 0.0f, 0.0f,     0.0f, 0.0f,
-            -1.0f,  1.0f,  1.0f,  -1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
+            -1.0f, -1.0f, -1.0f,   0.0f, 1.0f,        -1.0f,  0.0f, 0.0f,
+            -1.0f, -1.0f,  1.0f,   0.0f, 0.0f,        -1.0f,  0.0f, 0.0f,
+            -1.0f,  1.0f,  1.0f,   1.0f, 0.0f,        -1.0f,  0.0f, 0.0f,
 
             // Right face
-             1.0f,  1.0f,  1.0f,   1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
-             1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
-             1.0f,  1.0f, -1.0f,   1.0f, 0.0f, 0.0f,     1.0f, 1.0f,
+             1.0f,  1.0f,  1.0f,   1.0f, 0.0f,         1.0f,  0.0f, 0.0f,
+             1.0f, -1.0f, -1.0f,   0.0f, 1.0f,         1.0f,  0.0f, 0.0f,
+             1.0f,  1.0f, -1.0f,   1.0f, 1.0f,         1.0f,  0.0f, 0.0f,
 
-             1.0f, -1.0f, -1.0f,   1.0f, 0.0f, 0.0f,     0.0f, 1.0f,
-             1.0f,  1.0f,  1.0f,   1.0f, 0.0f, 0.0f,     1.0f, 0.0f,
-             1.0f, -1.0f,  1.0f,   1.0f, 0.0f, 0.0f,     0.0f, 0.0f,
+             1.0f, -1.0f, -1.0f,   0.0f, 1.0f,         1.0f,  0.0f, 0.0f,
+             1.0f,  1.0f,  1.0f,   1.0f, 0.0f,         1.0f,  0.0f, 0.0f,
+             1.0f, -1.0f,  1.0f,   0.0f, 0.0f,         1.0f,  0.0f, 0.0f,
 
              // Bottom face
-             -1.0f, -1.0f, -1.0f,   0.0f, -1.0f, 0.0f,    0.0f, 1.0f,
-              1.0f, -1.0f, -1.0f,   0.0f, -1.0f, 0.0f,    1.0f, 1.0f,
-              1.0f, -1.0f,  1.0f,   0.0f, -1.0f, 0.0f,    1.0f, 0.0f,
+             -1.0f, -1.0f, -1.0f,   0.0f, 1.0f,         0.0f, -1.0f, 0.0f,
+              1.0f, -1.0f, -1.0f,   1.0f, 1.0f,         0.0f, -1.0f, 0.0f,
+              1.0f, -1.0f,  1.0f,   1.0f, 0.0f,         0.0f, -1.0f, 0.0f,
 
-              1.0f, -1.0f,  1.0f,   0.0f, -1.0f, 0.0f,    1.0f, 0.0f,
-             -1.0f, -1.0f,  1.0f,   0.0f, -1.0f, 0.0f,    0.0f, 0.0f,
-             -1.0f, -1.0f, -1.0f,   0.0f, -1.0f, 0.0f,    0.0f, 1.0f,
+              1.0f, -1.0f,  1.0f,   1.0f, 0.0f,         0.0f, -1.0f, 0.0f,
+             -1.0f, -1.0f,  1.0f,   0.0f, 0.0f,         0.0f, -1.0f, 0.0f,
+             -1.0f, -1.0f, -1.0f,   0.0f, 1.0f,         0.0f, -1.0f, 0.0f,
 
              // Top face
-             -1.0f,  1.0f, -1.0f,   0.0f, 1.0f, 0.0f,     0.0f, 1.0f,
-              1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f,     1.0f, 0.0f,
-              1.0f,  1.0f, -1.0f,   0.0f, 1.0f, 0.0f,     1.0f, 1.0f,
+             -1.0f,  1.0f, -1.0f,   0.0f, 1.0f,         0.0f,  1.0f, 0.0f,
+              1.0f,  1.0f,  1.0f,   1.0f, 0.0f,         0.0f,  1.0f, 0.0f,
+              1.0f,  1.0f, -1.0f,   1.0f, 1.0f,         0.0f,  1.0f, 0.0f,
 
-              1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f,     1.0f, 0.0f,
-             -1.0f,  1.0f, -1.0f,   0.0f, 1.0f, 0.0f,     0.0f, 1.0f,
-             -1.0f,  1.0f,  1.0f,   0.0f, 1.0f, 0.0f,     0.0f, 0.0f
+              1.0f,  1.0f,  1.0f,   1.0f, 0.0f,         0.0f,  1.0f, 0.0f,
+             -1.0f,  1.0f, -1.0f,   0.0f, 1.0f,         0.0f,  1.0f, 0.0f,
+             -1.0f,  1.0f,  1.0f,   0.0f, 0.0f,         0.0f,  1.0f, 0.0f
         };
 
         glGenVertexArrays(1, &cubeVAO);
         glGenBuffers(1, &cubeVBO);
-        // fill buffer
+
         glBindBuffer(GL_ARRAY_BUFFER, cubeVBO);
         glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), vertices, GL_STATIC_DRAW);
-        // link vertex attributes
+
         glBindVertexArray(cubeVAO);
+        // layout(location = 0) - position
         glEnableVertexAttribArray(0);
         glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)0);
+
+        // layout(location = 1) - texcoord
         glEnableVertexAttribArray(1);
-        glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(3 * sizeof(float)));
+
+        // layout(location = 2) - normal
         glEnableVertexAttribArray(2);
-        glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(6 * sizeof(float)));
+        glVertexAttribPointer(2, 3, GL_FLOAT, GL_FALSE, 8 * sizeof(float), (void*)(5 * sizeof(float)));
+
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         glBindVertexArray(0);
     }
+
     // render Cube
     glBindVertexArray(cubeVAO);
     glDrawArrays(GL_TRIANGLES, 0, 36);
@@ -867,8 +875,10 @@ void Scene::Init()
       texture_ids[i] = LoadTexture(texture_names[i]);  
    }
 
+   cubeTextureID = LoadTexture(cubeTextureName);
 
-   createCubeTexture();
+
+   //createCubeTexture();
    AddDeferredShadingParams();
 
    Camera::UpdateP();
