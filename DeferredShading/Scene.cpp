@@ -82,6 +82,10 @@ enum class RenderMode {
 
 RenderMode currentRenderMode = RenderMode::Forward;
 
+std::vector<float> graphTimes;
+std::vector<int> graphLightCounts;
+bool triggerGraphTiming = false;
+
 
 
 namespace Scene
@@ -147,6 +151,8 @@ std::vector<SceneObject> initialObjects = {
     SceneObject(glm::vec3(-1.56f, -1.915f, -2.0f), glm::vec3(4.5f, 0.0f, 1.0f), glm::vec3(1.0f), 1),
     SceneObject(glm::vec3(0.0f, -1.206f, -0.709f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 4)
 };
+
+
 
 glm::vec3 newObjectPosition = glm::vec3(0.0f, 0.0f, 0.0f);
 
@@ -416,6 +422,52 @@ void Scene::Display(GLFWwindow* window)
       VideoRecorder::EncodeBuffer(GL_BACK);
    }
 
+   if (triggerGraphTiming)
+   {
+       const int iterations = 5;
+       float totalTime = 0.0f;
+
+       for (int i = 0; i < iterations; ++i)
+       {
+           glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+           glBeginQuery(GL_TIME_ELAPSED, gpuTimerQuery);
+
+           if (currentRenderMode == RenderMode::Deferred)
+           {
+               glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+               glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+               glUseProgram(shader_program_geometry);
+               renderSceneGeometry();
+               glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+               glUseProgram(shader_program_deferred);
+               glActiveTexture(GL_TEXTURE0); glBindTexture(GL_TEXTURE_2D, gPosition);
+               glActiveTexture(GL_TEXTURE1); glBindTexture(GL_TEXTURE_2D, gNormal);
+               glActiveTexture(GL_TEXTURE2); glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
+               renderQuad();
+           }
+           else
+           {
+               glUseProgram(shader_program);
+               renderSceneGeometry();
+           }
+
+           glEndQuery(GL_TIME_ELAPSED);
+           glFinish();
+
+           GLuint64 elapsed;
+           glGetQueryObjectui64v(gpuTimerQuery, GL_QUERY_RESULT, &elapsed);
+           totalTime += elapsed / 1e6f;
+       }
+
+       float avg = totalTime / iterations;
+       graphTimes.push_back(avg);
+       graphLightCounts.push_back(numLights);
+
+       triggerGraphTiming = false;
+   }
+
+
    /* Swap front and back buffers */
    glfwSwapBuffers(window);
 }
@@ -585,7 +637,11 @@ void Scene::DrawGui(GLFWwindow* window)
                    Uniforms::LightData.specularColors[i] = globalSpecular;
                }
            }
-      
+     
+
+
+
+
 
        ImGui::End();
 
@@ -699,7 +755,34 @@ void Scene::DrawGui(GLFWwindow* window)
    ImGui::PlotLines("GPU Time", frameTimeBuffer, sampleCount, 0, nullptr, 0.0f, 50.0f, ImVec2(0, 150));
 
 
+   ImGui::Separator();
+   ImGui::Text("Performance Graph (Live)");
 
+   if (ImGui::Button("Measure & Add to Graph"))
+   {
+       triggerGraphTiming = true;
+   }
+
+   // Show live graph
+   if (!graphTimes.empty())
+   {
+       std::vector<float> xAxis(graphLightCounts.begin(), graphLightCounts.end());
+
+       // Plot as bar graph: time per light count
+       ImGui::PlotLines("GPU Time (ms)", graphTimes.data(), graphTimes.size(), 0, nullptr, 0.0f, 50.0f, ImVec2(0, 150));
+
+       // Show raw data
+       for (size_t i = 0; i < graphTimes.size(); ++i)
+       {
+           ImGui::Text("Lights: %d | Time: %.3f ms", graphLightCounts[i], graphTimes[i]);
+       }
+
+       if (ImGui::Button("Clear Graph"))
+       {
+           graphTimes.clear();
+           graphLightCounts.clear();
+       }
+   }
 
    ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / ImGui::GetIO().Framerate, ImGui::GetIO().Framerate);
 
