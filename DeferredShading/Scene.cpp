@@ -1,4 +1,4 @@
-//When using this as a template, be sure to make these changes in the new project: 
+﻿//When using this as a template, be sure to make these changes in the new project: 
 //1. In Debugging properties set the Environment to PATH=%PATH%;$(SolutionDir)\lib;
 //2. Change window_title below
 //3. Copy assets (mesh and texture) to new project directory
@@ -32,6 +32,9 @@
 
 const int Scene::InitWindowWidth = 1024;
 const int Scene::InitWindowHeight = 1024;
+int gBufferWidth = Scene::InitWindowWidth;
+int gBufferHeight = Scene::InitWindowHeight;
+
 
 static const std::string vertex_shader("multi_vs.glsl");
 static const std::string fragment_shader("multi_fs.glsl");
@@ -44,19 +47,25 @@ static const std::string vertex_shader_deferred("deferred_vs.glsl");
 static const std::string fragment_shader_deferred("deferred_fs.glsl");
 
 GLuint shader_program = -1;
+GLuint shader_program_geometry = -1;
+GLuint shader_program_deferred = -1;
 
-static const std::string mesh_name = "models/Amago0.obj";
-static const std::string mesh_name2 = "models/cat.obj";
-static const std::string texture_name = "textures/AmagoT.bmp";
-static const std::string texture_name2 = "textures/cat.jpeg";
+static const std::string mesh_names[] = { "models/Amago0.obj", "models/cat.obj", "models/sm_gamecontroller.fbx", "models/sm_gamecontroller.fbx" };
+static const std::string texture_names[] = { "textures/AmagoT.bmp", "textures/cat.jpeg", "textures/T_GameController_Black_BaseColor.png", "textures/T_GameController_Gold_BaseColor.png"};
 
-GLuint texture_id = -1; //Texture map for mesh
-GLuint texture_id2 = -1; //Texture map for mesh
-MeshData mesh_data;
-MeshData mesh_data2;
+
+GLuint texture_ids[std::size(texture_names)] = {-1}; // Initialize with default GLuint values (0)
+MeshData mesh_data_array[std::size(mesh_names)];  // Array for mesh data
+
+GLuint gBuffer;
+GLuint gPosition, gNormal, gAlbedoSpec;
+GLuint rboDepth;
+
+
+static const std::string cubeTextureName = "textures/"; //I'll try adding the cube texture here for the rendering cube
 
 GLuint cubeTextureID = -1;
-glm::vec3 cubeColor = glm::vec3(0.3f, 0.7f, 1.0f); // <-- whatever color you want, e.g., light blue
+glm::vec3 cubeColor = glm::vec3(0.3f, 0.7f, 1.0f); // To change the render cube color
 glm::vec3 cubePosition = glm::vec3(0.936f, 5.596f, 1.512f);
 glm::vec3 cubeScale = glm::vec3(7.5f);
 
@@ -64,6 +73,16 @@ glm::vec3 cubeScale = glm::vec3(7.5f);
 float angle = 0.0f;
 float scale = 1.0f;
 bool recording = false;
+
+
+enum class RenderMode {
+    Forward,
+    Deferred
+};
+
+RenderMode currentRenderMode = RenderMode::Forward;
+
+
 
 namespace Scene
 {
@@ -123,7 +142,7 @@ public:
 std::vector<SceneObject> sceneObjects;
 
 std::vector<SceneObject> initialObjects = {
-    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 1),
+    SceneObject(glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(1.0f), 2),
     SceneObject(glm::vec3(1.5f, 0.0f, -2.0f), glm::vec3(0.0f, 45.0f, 0.0f), glm::vec3(0.5f), 1),
     SceneObject(glm::vec3(-0.5f, 0.0f, 1.5f), glm::vec3(0.0f, 90.0f, 0.0f), glm::vec3(0.75f), 0)
 };
@@ -216,6 +235,97 @@ void renderCube()
 
 
 
+void renderSceneGeometry()
+{
+    glm::mat4 model = glm::mat4(1.0f);
+
+    // Render Cube
+    model = glm::translate(model, cubePosition);
+    model = glm::scale(model, cubeScale);
+    glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+    glUniform1i(Uniforms::UniformLocs::invertedNormals, 1);
+    glBindTextureUnit(0, cubeTextureID);
+    renderCube();
+    glUniform1i(Uniforms::UniformLocs::invertedNormals, 0);
+
+    // Render Scene Objects
+    for (const auto& obj : sceneObjects)
+    {
+        glm::mat4 model = obj.getModelMatrix();
+        int meshIndex = obj.meshIndex;
+
+        if (meshIndex >= 0 && meshIndex < std::size(mesh_names)) // Ensure valid index
+        {
+            glBindTextureUnit(0, texture_ids[meshIndex]);
+            model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data_array[meshIndex].mScaleFactor));
+
+            glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
+            glBindVertexArray(mesh_data_array[meshIndex].mVao);
+            mesh_data_array[meshIndex].DrawMesh();
+        }
+    }
+}
+
+
+unsigned int quadVAO = 0;
+unsigned int quadVBO;
+void renderQuad()
+{
+    if (quadVAO == 0)
+    {
+        float quadVertices[] = {
+            // positions   // texCoords
+            -1.0f,  1.0f,  0.0f, 1.0f,
+            -1.0f, -1.0f,  0.0f, 0.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+
+            -1.0f,  1.0f,  0.0f, 1.0f,
+             1.0f, -1.0f,  1.0f, 0.0f,
+             1.0f,  1.0f,  1.0f, 1.0f
+        };
+
+        glGenVertexArrays(1, &quadVAO);
+        glGenBuffers(1, &quadVBO);
+        glBindVertexArray(quadVAO);
+        glBindBuffer(GL_ARRAY_BUFFER, quadVBO);
+        glBufferData(GL_ARRAY_BUFFER, sizeof(quadVertices), &quadVertices, GL_STATIC_DRAW);
+
+        // position attribute
+        glEnableVertexAttribArray(0);
+        glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)0);
+
+        // texcoord attribute
+        glEnableVertexAttribArray(1);
+        glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float), (void*)(2 * sizeof(float)));
+    }
+
+    glBindVertexArray(quadVAO);
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    glBindVertexArray(0);
+}
+
+void ResizeGBuffer(int width, int height) {
+    gBufferWidth = width;
+    gBufferHeight = height;
+
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, width, height, 0, GL_RGBA, GL_FLOAT, NULL);
+
+    glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, width, height, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, width, height);
+
+    glBindTexture(GL_TEXTURE_2D, 0);
+    glBindRenderbuffer(GL_RENDERBUFFER, 0);
+}
+
+
+
 // This function gets called every time the scene gets redisplayed
 void Scene::Display(GLFWwindow* window)
 {
@@ -224,75 +334,57 @@ void Scene::Display(GLFWwindow* window)
 
    glBeginQuery(GL_TIME_ELAPSED, gpuTimerQuery);
 
+
+   int currentWidth, currentHeight;
+   glfwGetFramebufferSize(window, &currentWidth, &currentHeight);
+
+   if (currentWidth != gBufferWidth || currentHeight != gBufferHeight)
+   {
+       ResizeGBuffer(currentWidth, currentHeight);
+       Scene::Camera::Aspect = static_cast<float>(currentWidth) / static_cast<float>(currentHeight);
+       Scene::Camera::UpdateP();
+   }
+
+
    Camera::V = glm::lookAt(glm::vec3(Uniforms::SceneData.eye_w), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f));
    Uniforms::SceneData.PV = Camera::P * Camera::V;
    Uniforms::BufferSceneData();
 
-   glUseProgram(shader_program);
-
-
-   //Note that we don't need to set the value of a uniform here. The value is set with the "binding" in the layout qualifier
-
-
-
-   glm::mat4 model = glm::mat4(1.0f);
-
-   model = glm::translate(model, cubePosition);
-   model = glm::scale(model, cubeScale);
-   glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
-
-   glUniform1i(Uniforms::UniformLocs::invertedNormals, 1);
-   glBindTextureUnit(0, cubeTextureID);
-   renderCube();
-   glUniform1i(Uniforms::UniformLocs::invertedNormals, 0);
-
-
-
-
-   for (const auto& obj : sceneObjects)
+   if (currentRenderMode == RenderMode::Deferred)
    {
-       glm::mat4 model = obj.getModelMatrix();
+       // ---- GEOMETRY PASS ----
+       glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-       if (obj.meshIndex == 0)
-       {
-           glBindTextureUnit(0, texture_id);
-           model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data.mScaleFactor));
+       glUseProgram(shader_program_geometry);
 
-           glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
-           glBindVertexArray(mesh_data.mVao);
-           mesh_data.DrawMesh();
-       }
-       else if (obj.meshIndex == 1)
-       {
-           glBindTextureUnit(0, texture_id2);
-           model = model * glm::scale(glm::mat4(1.0f), glm::vec3(mesh_data2.mScaleFactor));
+       renderSceneGeometry(); // ⬅️ New function
 
-           glUniformMatrix4fv(Uniforms::UniformLocs::M, 1, false, glm::value_ptr(model));
-           glBindVertexArray(mesh_data2.mVao);
-           mesh_data2.DrawMesh();
-       }
+       glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+       // ---- LIGHTING PASS ----
+       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+       glUseProgram(shader_program_deferred);
+
+       glActiveTexture(GL_TEXTURE0);
+       glBindTexture(GL_TEXTURE_2D, gPosition);
+       glActiveTexture(GL_TEXTURE1);
+       glBindTexture(GL_TEXTURE_2D, gNormal);
+       glActiveTexture(GL_TEXTURE2);
+       glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
+
+       renderQuad(); // ⬅️ Fullscreen pass
+   }
+   else
+   {
+       // ---- FORWARD RENDERING ----
+       glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+       glUseProgram(shader_program);
+
+       renderSceneGeometry(); // ⬅️ Reuse the same geometry drawing function
    }
 
-
-
-   //For meshes with multiple submeshes use mesh_data.DrawMesh(); 
-
-
-   // Populate 100 lights (example)
-
-   //for (int i = 0; i < Uniforms::LightData.numLights; ++i)
-   //{
-   //    float angle = 2.0f * glm::pi<float>() * (float)i / Uniforms::LightData.numLights;
-   //    float x = 3.0f * cos(angle);
-   //    float z = 3.0f * sin(angle);
-
-   //    Uniforms::LightData.positions[i] = glm::vec4(x, 2.0f, z, 1.0f);
-   //    Uniforms::LightData.diffuseColors[i] = glm::vec4(glm::vec3(0.5f + 0.5f * sin(i)), 1.0f);
-   //    Uniforms::LightData.specularColors[i] = glm::vec4(1.0f);
-   //    Uniforms::LightData.radii[i] = 5.0f;
-   //}
-
-   //Uniforms::BufferLightData();
 
    glEndQuery(GL_TIME_ELAPSED);
 
@@ -375,12 +467,25 @@ void Scene::DrawGui(GLFWwindow* window)
    ImGui::SliderFloat3("Cube Position", glm::value_ptr(cubePosition), -10.0, 10.0);
    ImGui::SliderFloat3("Cube Scale", glm::value_ptr(cubeScale), -10.0, 10.0);
 
+
+   ImGui::Text("Rendering Mode");
+   int mode = static_cast<int>(currentRenderMode);
+   ImGui::RadioButton("Forward", &mode, 0);
+   ImGui::RadioButton("Deferred", &mode, 1);
+   currentRenderMode = static_cast<RenderMode>(mode);
+
+
    ImGui::Separator();
 
    ImGui::Separator();
    ImGui::Text("Add New Object");
    static int selectedMeshIndex = 0; // 0: mesh_data, 1: mesh_data2
-   ImGui::Combo("Mesh", &selectedMeshIndex, "Mesh 0\0Mesh 1\0");
+   // Dynamically generate the combo box items based on the size of the mesh_names array
+   std::string comboItems;
+   for (size_t i = 0; i < std::size(mesh_names); ++i) {
+      comboItems += "Mesh " + std::to_string(i) + '\0';
+   }
+   ImGui::Combo("Mesh", &selectedMeshIndex, comboItems.c_str());
 
    if (ImGui::Button("Add Object"))
    {
@@ -405,6 +510,13 @@ void Scene::DrawGui(GLFWwindow* window)
        }
        ImGui::PopID();
    }
+
+   ImGui::Separator();
+
+   ImGui::Image((ImTextureID)gPosition, ImVec2(256, 256));
+   ImGui::Image((ImTextureID)gNormal, ImVec2(256, 256));
+   ImGui::Image((ImTextureID)gAlbedoSpec, ImVec2(256, 256));
+
 
    ImGui::Separator();
 
@@ -605,25 +717,38 @@ void Scene::Idle()
 
 void Scene::ReloadShader()
 {
-   GLuint new_shader = InitShader(vertex_shader.c_str(), fragment_shader.c_str());
-   GLuint new_geometry_shader = InitShader(vertex_shader_geometry.c_str(), fragment_shader_geometry.c_str());
 
+     GLuint new_shader = InitShader(vertex_shader.c_str(), fragment_shader.c_str());  
+     GLuint new_geometry_shader = InitShader(vertex_shader_geometry.c_str(), fragment_shader_geometry.c_str());  
+     GLuint new_deferred_shader = InitShader(vertex_shader_deferred.c_str(), fragment_shader_deferred.c_str());  
 
-   if (new_shader == -1) // loading failed
-   {
-      DebugBreak(); //alert user by breaking and showing debugger
-      glClearColor(1.0f, 0.0f, 1.0f, 0.0f); //change clear color if shader can't be compiled
-   }
-   else
-   {
-      glClearColor(0.35f, 0.35f, 0.35f, 0.0f);
+     if (new_shader == -1 || new_geometry_shader == -1 || new_deferred_shader == -1) // loading failed  
+     {  
+        DebugBreak(); // alert user by breaking and showing debugger  
+        glClearColor(1.0f, 0.0f, 1.0f, 0.0f); // change clear color if shader can't be compiled  
+     }  
+     else  
+     {  
+        glClearColor(0.35f, 0.35f, 0.35f, 0.0f);  
 
-      if (shader_program != -1)
-      {
-         glDeleteProgram(shader_program);
-      }
-      shader_program = new_shader;
-   }
+        if (shader_program != -1)  
+        {  
+           glDeleteProgram(shader_program);  
+        }  
+        shader_program = new_shader;  
+
+        if (shader_program_geometry != -1)  
+        {  
+           glDeleteProgram(shader_program_geometry);  
+        }  
+        shader_program_geometry = new_geometry_shader;  
+
+        if (shader_program_deferred != -1)  
+        {  
+           glDeleteProgram(shader_program_deferred);  
+        }  
+        shader_program_deferred = new_deferred_shader;  
+     }  
 }
 
 void createCubeTexture() {
@@ -644,6 +769,51 @@ void createCubeTexture() {
 
     glBindTexture(GL_TEXTURE_2D, 0);
 
+
+}
+
+void AddDeferredShadingParams() {
+    glGenFramebuffers(1, &gBuffer);
+    glBindFramebuffer(GL_FRAMEBUFFER, gBuffer);
+
+    // - Position color buffer
+    glGenTextures(1, &gPosition);
+    glBindTexture(GL_TEXTURE_2D, gPosition);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, Scene::InitWindowWidth, Scene::InitWindowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, gPosition, 0);
+
+    // - Normal color buffer
+    glGenTextures(1, &gNormal);
+    glBindTexture(GL_TEXTURE_2D, gNormal);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, Scene::InitWindowWidth, Scene::InitWindowHeight, 0, GL_RGBA, GL_FLOAT, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT1, GL_TEXTURE_2D, gNormal, 0);
+
+    // - Albedo + Specular color buffer
+    glGenTextures(1, &gAlbedoSpec);
+    glBindTexture(GL_TEXTURE_2D, gAlbedoSpec);
+    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, Scene::InitWindowWidth, Scene::InitWindowHeight, 0, GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT2, GL_TEXTURE_2D, gAlbedoSpec, 0);
+
+    // - Depth buffer
+    glGenRenderbuffers(1, &rboDepth);
+    glBindRenderbuffer(GL_RENDERBUFFER, rboDepth);
+    glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT, Scene::InitWindowWidth, Scene::InitWindowHeight);
+    glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, rboDepth);
+
+    // - Tell OpenGL which color attachments we'll use (of this framebuffer) for rendering 
+    GLuint attachments[3] = { GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1, GL_COLOR_ATTACHMENT2 };
+    glDrawBuffers(3, attachments);
+
+    // - Finally check if framebuffer is complete
+    if (glCheckFramebufferStatus(GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+        std::cerr << "Framebuffer not complete!" << std::endl;
+    glBindFramebuffer(GL_FRAMEBUFFER, 0);
 
 }
 
@@ -685,15 +855,21 @@ void Scene::Init()
    glEnable(GL_DEPTH_TEST);
 
    ReloadShader();
-   mesh_data = LoadMesh(mesh_name);
+   // Replace the following lines:  
+   // mesh_data = LoadMesh(mesh_name);  
+   // mesh_data2 = LoadMesh(mesh_name2);  
+   // texture_id = LoadTexture(texture_name);  
+   // texture_id2 = LoadTexture(texture_name2);  
 
-   mesh_data2 = LoadMesh(mesh_name2);
-   texture_id = LoadTexture(texture_name);
-   texture_id2 = LoadTexture(texture_name2); 
+   // With the following implementation using arrays:  
+   for (int i = 0; i < std::size(mesh_names); ++i) {  
+      mesh_data_array[i] = LoadMesh(mesh_names[i]);  
+      texture_ids[i] = LoadTexture(texture_names[i]);  
+   }
 
 
    createCubeTexture();
-
+   AddDeferredShadingParams();
 
    Camera::UpdateP();
    Uniforms::Init();
